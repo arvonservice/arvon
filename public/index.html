@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arvon — Duels de trading memecoin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <button class="logo-btn" id="logoBtn" aria-label="Retour au lobby"><img class="logo" src="/assets/logo.png" alt="Arvon"></button>
+
+  <nav class="main-nav" id="mainNav">
+    <button class="nav-link active" data-view="lobby" data-i18n="nav.play">Jouer</button>
+    <button class="nav-link" data-view="players" data-i18n="nav.players">Joueurs</button>
+    <button class="nav-link" data-view="leaderboard" data-i18n="nav.leaderboard">Classement</button>
+  </nav>
+
+  <div class="account-box">
+    <div class="lang-switch" id="langSwitch">
+      <button class="lang-btn" data-lang="fr">FR</button>
+      <button class="lang-btn" data-lang="en">EN</button>
+    </div>
+
+    <div id="authButtons" class="auth-buttons">
+      <button id="showLoginBtn" class="btn btn-outline" data-i18n="nav.login">Se connecter</button>
+      <button id="showRegisterBtn" class="btn btn-primary" data-i18n="nav.register">Creer un compte</button>
+    </div>
+
+    <div id="accountArea" class="account-area hidden">
+      <div class="wallet-menu">
+        <button id="walletBtn" class="wallet-pill">
+          <span id="walletDot" class="dot"></span>
+          <span id="walletLabel" data-i18n="wallet.notConnected">Wallet non connecte</span>
+        </button>
+        <div class="dropdown hidden" id="walletDropdown">
+          <div class="dropdown-info" id="walletDropdownAddress"></div>
+          <button id="disconnectWalletBtn" data-i18n="wallet.disconnect">Deconnecter le wallet</button>
+        </div>
+      </div>
+
+      <div class="profile-menu">
+        <button class="profile-pill" id="profilePillBtn">
+          <img id="navAvatar" class="avatar-sm" src="" alt="">
+          <span id="navName"></span>
+          <span class="caret">▾</span>
+        </button>
+        <div class="dropdown hidden" id="accountDropdown">
+          <button data-view="profile" data-i18n="nav.myProfile">Mon profil</button>
+          <button id="logoutBtn" data-i18n="nav.logout">Deconnexion</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="ticker-tape" id="tickerTape">
+  <div class="ticker-track" id="tickerTrack"></div>
+</div>
+
+<main id="app">
+
+  <!-- ================= LOBBY ================= -->
+  <section id="lobby" class="view active">
+    <div class="arcade">
+
+      <div class="arcade-topline">
+        <span class="blip-dot"></span>
+        <span class="arcade-topline-text" data-i18n="hero.badge">TRADING PVP EN DIRECT</span>
+        <span class="arcade-topline-sep">//</span>
+        <span class="arcade-topline-text2" data-i18n="arcade.selectPrompt">SELECTIONNE TON FORMAT</span>
+      </div>
+
+      <!-- ============ SELECTION DE FORMAT (façon ecran de selection de perso) ============ -->
+      <div class="blade-stage">
+        <div class="blade-row" id="modeRow">
+          <button class="blade" data-mode="1v1" style="--accent: var(--green)">
+            <span class="blade-num">01</span>
+            <span class="blade-bg-icon"><svg viewBox="0 0 60 16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M25,14 L30,3 L35,14"/></svg></span>
+            <span class="blade-label"><span class="blade-label-text">1V1</span></span>
+            <div class="blade-details">
+              <span class="blade-details-icon"><svg viewBox="0 0 60 16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M25,14 L30,3 L35,14"/></svg></span>
+              <span class="blade-details-title">1V1</span>
+              <span class="blade-details-sub" data-i18n="mode.1v1.sub">Duel simple</span>
+            </div>
+          </button>
+          <button class="blade" data-mode="2v2" style="--accent: var(--green)">
+            <span class="blade-num">02</span>
+            <span class="blade-bg-icon"><svg viewBox="0 0 60 16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20,14 L25,3 L30,14"/><path d="M30,14 L35,3 L40,14"/></svg></span>
+            <span class="blade-label"><span class="blade-label-text">2V2</span></span>
+            <div class="blade-details">
+              <span class="blade-details-icon"><svg viewBox="0 0 60 16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20,14 L25,3 L30,14"/><path d="M30,14 L35,3 L40,14"/></svg></span>
+              <span class="blade-details-title">2V2</span>
+              <span class="blade-details-sub" data-i18n="mode.2v2.sub">Equipes de 2</span>
+            </div>
+          </button>
+          <button class="blade" data-mode="3v3" style="--accent: var(--green)">
+            <span class="blade-num">03</span>
+            <span class="blade-bg-icon"><svg viewBox="0 0 60 16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15,14 L20,3 L25,14"/><path d="M25,14 L30,3 L35,14"/><path d="M35,14 L40,3 L45,14"/></svg></span>
+            <span class="blade-label"><span class="blade-label-text">3V3</span></span>
+            <div class="blade-details">
+              <span class="blade-details-icon"><svg viewBox="0 0 60 16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15,14 L20,3 L25,14"/><path d="M25,14 L30,3 L35,14"/><path d="M35,14 L40,3 L45,14"/></svg></span>
+              <span class="blade-details-title">3V3</span>
+              <span class="blade-details-sub" data-i18n="mode.3v3.sub">Equipes de 3</span>
+            </div>
+          </button>
+          <button class="blade" data-mode="4v4" style="--accent: var(--green)">
+            <span class="blade-num">04</span>
+            <span class="blade-bg-icon"><svg viewBox="0 0 60 16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M10,14 L15,3 L20,14"/><path d="M20,14 L25,3 L30,14"/><path d="M30,14 L35,3 L40,14"/><path d="M40,14 L45,3 L50,14"/></svg></span>
+            <span class="blade-label"><span class="blade-label-text">4V4</span></span>
+            <div class="blade-details">
+              <span class="blade-details-icon"><svg viewBox="0 0 60 16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M10,14 L15,3 L20,14"/><path d="M20,14 L25,3 L30,14"/><path d="M30,14 L35,3 L40,14"/><path d="M40,14 L45,3 L50,14"/></svg></span>
+              <span class="blade-details-title">4V4</span>
+              <span class="blade-details-sub" data-i18n="mode.4v4.sub">Equipes de 4</span>
+            </div>
+          </button>
+          <button class="blade" data-mode="5v5" style="--accent: var(--green)">
+            <span class="blade-num">05</span>
+            <span class="blade-bg-icon"><svg viewBox="0 0 60 16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5,14 L10,3 L15,14"/><path d="M15,14 L20,3 L25,14"/><path d="M25,14 L30,3 L35,14"/><path d="M35,14 L40,3 L45,14"/><path d="M45,14 L50,3 L55,14"/></svg></span>
+            <span class="blade-label"><span class="blade-label-text">5V5</span></span>
+            <div class="blade-details">
+              <span class="blade-details-icon"><svg viewBox="0 0 60 16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5,14 L10,3 L15,14"/><path d="M15,14 L20,3 L25,14"/><path d="M25,14 L30,3 L35,14"/><path d="M35,14 L40,3 L45,14"/><path d="M45,14 L50,3 L55,14"/></svg></span>
+              <span class="blade-details-title">5V5</span>
+              <span class="blade-details-sub" data-i18n="mode.5v5.sub">Equipes de 5</span>
+            </div>
+          </button>
+          <button class="blade blade-br" data-mode="br" style="--accent: var(--yellow)">
+            <span class="blade-num">06</span>
+            <span class="blade-bg-icon"><svg viewBox="0 0 60 40" fill="currentColor"><path d="M8,32 L8,16 L20,26 L30,8 L40,26 L52,16 L52,32 Z"/></svg></span>
+            <span class="blade-label"><span class="blade-label-text" data-i18n="mode.br">BATTLE ROYALE</span></span>
+            <div class="blade-details">
+              <span class="blade-details-icon"><svg viewBox="0 0 60 40" fill="currentColor"><path d="M8,32 L8,16 L20,26 L30,8 L40,26 L52,16 L52,32 Z"/></svg></span>
+              <span class="blade-details-title" data-i18n="mode.br">Battle Royale</span>
+              <span class="blade-details-sub" data-i18n="mode.br.sub">15 joueurs · 30 min</span>
+            </div>
+          </button>
+          <button class="blade blade-duel" data-mode="duel" style="--accent: var(--red)">
+            <span class="blade-num">07</span>
+            <span class="blade-bg-icon"><svg viewBox="0 0 60 40" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"><line x1="12" y1="8" x2="48" y2="32"/><line x1="48" y1="8" x2="12" y2="32"/></svg></span>
+            <span class="blade-label"><span class="blade-label-text" data-i18n="mode.duel">DEFI DIRECT</span></span>
+            <div class="blade-details">
+              <span class="blade-details-icon"><svg viewBox="0 0 60 40" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"><line x1="12" y1="8" x2="48" y2="32"/><line x1="48" y1="8" x2="12" y2="32"/></svg></span>
+              <span class="blade-details-title" data-i18n="mode.duel">Defi direct</span>
+              <span class="blade-details-sub" data-i18n="mode.duel.sub">Cible un joueur</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div class="config-dock">
+
+        <!-- ============ PREVIEW (panneau central dynamique) ============ -->
+        <div class="preview-frame">
+          <span class="preview-corner tl"></span>
+          <span class="preview-corner tr"></span>
+          <span class="preview-corner bl"></span>
+          <span class="preview-corner br"></span>
+
+          <div class="preview-idle" id="previewIdle">
+            <div class="preview-idle-radar">
+              <div class="preview-idle-ring"></div>
+              <div class="preview-idle-glyph">?</div>
+            </div>
+            <p data-i18n="arcade.idleHint">Choisis un format a gauche pour configurer ta partie.</p>
+          </div>
+
+          <div class="preview-body hidden" id="previewStandard">
+            <div class="preview-block">
+              <h4 class="preview-block-label" data-i18n="duration.title">Duree du match</h4>
+              <div class="duration-dial" id="durationRow">
+                <button class="chip" data-duration="1m">1 min</button>
+                <button class="chip" data-duration="5m">5 min</button>
+                <button class="chip" data-duration="10m">10 min</button>
+                <button class="chip" data-duration="15m">15 min</button>
+                <button class="chip" data-duration="30m">30 min</button>
+                <button class="chip" data-duration="1h" data-i18n="duration.1h">1 heure</button>
+              </div>
+            </div>
+
+            <div class="preview-block" id="stakeBlockStandard">
+              <h4 class="preview-block-label" data-i18n="stake.title">Format de mise</h4>
+              <div class="stake-switch">
+                <button class="stake-switch-opt selected" data-stake-mode="free" data-i18n="stake.free">Gratuit</button>
+                <button class="stake-switch-opt" data-stake-mode="cash"><svg class="inline-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><line x1="5" y1="8" x2="11" y2="8"/></svg><span data-i18n="stake.cash">Cash (argent reel · USDT)</span></button>
+              </div>
+              <div class="hidden" id="cashOptions">
+                <p class="hint cash-real-warning" data-i18n="stake.realMoneyWarning">Argent reel : chaque mise est une transaction USDT reelle et irreversible. Une commission de 15% est prelevee sur le pot du vainqueur.</p>
+                <p class="hint" id="cashPhantomWarning" style="text-align:left; color:var(--yellow);"></p>
+                <p class="hint" style="text-align:left;" data-i18n="stake.hint">Chacun choisit sa propre mise (minimum 1$) juste avant le debut du match — pas besoin de mettre le meme montant que ton adversaire. Des bots peuvent completer la table ; s'ils gagnent, la mise reste acquise a la plateforme (ils ne misent jamais rien eux-memes).</p>
+                <div class="wallet-balance-row">
+                  <span data-i18n="stake.balance">Solde USDT :</span> <strong id="usdtBalance">—</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="preview-block trader-recap-block">
+              <h4 class="preview-block-label" data-i18n="recap24h.title">Ton recap trading</h4>
+              <div class="trader-recap"></div>
+            </div>
+          </div>
+
+          <div class="preview-body hidden" id="previewBr">
+            <div class="preview-block">
+              <h4 class="preview-block-label" data-i18n="br.rulesTitle">Regles du Battle Royale</h4>
+              <ul class="br-rules">
+                <li data-i18n="br.rule0">15 traders s'affrontent en meme temps</li>
+                <li data-i18n="br.rule1">Duree maximum : 30 minutes</li>
+                <li data-i18n="br.rule2">Toutes les 2 minutes, le PnL % le plus bas est elimine</li>
+                <li data-i18n="br.rule3">Dernier survivant = vainqueur (empoche tout le pot en mode Cash)</li>
+                <li data-i18n="br.rule4">Une fois elimine, tu peux regarder la suite ou retourner au lobby</li>
+              </ul>
+            </div>
+
+            <div class="preview-block">
+              <h4 class="preview-block-label" data-i18n="stake.title">Format de mise</h4>
+              <div class="stake-switch">
+                <button class="stake-switch-opt selected" data-stake-mode="free" data-i18n="stake.free">Gratuit</button>
+                <button class="stake-switch-opt" data-stake-mode="cash"><svg class="inline-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><line x1="5" y1="8" x2="11" y2="8"/></svg><span data-i18n="stake.cash">Cash (argent reel · USDT)</span></button>
+              </div>
+            </div>
+
+            <div class="preview-block trader-recap-block">
+              <h4 class="preview-block-label" data-i18n="recap24h.title">Ton recap trading</h4>
+              <div class="trader-recap"></div>
+            </div>
+          </div>
+
+          <div class="preview-body hidden" id="previewDuel">
+            <p class="hint" style="text-align:left; margin:0 0 16px;" data-i18n="duel.hint">Cherche un joueur et envoie-lui un defi 1v1.</p>
+            <div class="preview-block">
+              <div class="search-bar">
+                <input type="text" id="duelSearchInput" data-i18n-placeholder="players.searchPlaceholder" placeholder="Pseudo ou adresse wallet...">
+                <button id="duelSearchBtn" class="btn btn-primary" data-i18n="players.search">Rechercher</button>
+              </div>
+              <div id="duelSearchResults" class="duel-results"></div>
+              <p id="duelSearchEmpty" class="hint hidden" data-i18n="players.empty">Aucun joueur trouve.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ HUD TICKET (recap + lancement) ============ -->
+        <aside class="hud-ticket" id="hudTicket">
+          <div class="hud-ticket-title" data-i18n="recap.title">Recapitulatif</div>
+          <div class="hud-row">
+            <span data-i18n="recap.format">Format</span>
+            <strong id="recapMode">—</strong>
+          </div>
+          <div class="hud-row">
+            <span data-i18n="recap.duration">Duree</span>
+            <strong id="recapDuration">—</strong>
+          </div>
+          <div class="hud-row">
+            <span data-i18n="recap.stake">Mise</span>
+            <strong id="recapStake" data-i18n="stake.free">Gratuit</strong>
+          </div>
+
+          <div class="hud-punch"></div>
+
+          <div class="requirements">
+            <div class="req-row" id="reqAccount">
+              <span class="req-dot"></span>
+              <span class="req-text" data-i18n="recap.accountConnected">Compte connecte</span>
+              <button class="req-action" id="reqAccountAction" data-i18n="recap.connect">Se connecter</button>
+            </div>
+            <div class="req-row" id="reqWallet">
+              <span class="req-dot"></span>
+              <span class="req-text" data-i18n="recap.walletConnected">Wallet connecte</span>
+              <button class="req-action" id="reqWalletAction" data-i18n="recap.connectWallet">Connecter</button>
+            </div>
+          </div>
+
+          <div class="hud-launch-area">
+            <button id="findMatchBtn" class="btn-launch" disabled>
+              <svg class="btn-launch-icon" viewBox="0 0 24 24"><path d="M6,3 L20,12 L6,21 Z"/></svg>
+              <span data-i18n="recap.joinMatch">Rejoindre un match</span>
+            </button>
+            <p class="hint hud-launch-hint" data-i18n="recap.hintBots">Pas assez de joueurs en ligne ? Des bots rejoindront automatiquement apres quelques secondes.</p>
+          </div>
+        </aside>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SEARCHING ================= -->
+  <section id="searching" class="view">
+    <div class="searching-box">
+      <div class="spinner"></div>
+      <h2 data-i18n="searching.title">Recherche d'un match...</h2>
+      <p id="searchInfo" data-i18n="searching.waitingOpponents">En attente d'adversaires</p>
+      <p id="searchTimer" class="search-timer">0s</p>
+      <button id="cancelBtn" class="btn btn-outline" data-i18n="searching.cancel">Annuler</button>
+    </div>
+  </section>
+
+  <!-- ================= MATCH ================= -->
+  <section id="matchScreen" class="view">
+    <div class="match-hud">
+      <div class="match-header">
+        <div class="team-header-block">
+          <div class="team-label team-a" data-i18n="match.teamA">Equipe A</div>
+          <div class="team-pnl-live" id="teamAPnlLive" hidden></div>
+        </div>
+        <div class="timer-box">
+          <div class="timer-ring">
+            <div id="matchTimer">00:00</div>
+          </div>
+          <div class="mode-label" id="matchModeLabel"></div>
+        </div>
+        <div class="team-header-block">
+          <div class="team-label team-b" data-i18n="match.teamB">Equipe B</div>
+          <div class="team-pnl-live" id="teamBPnlLive" hidden></div>
+        </div>
+      </div>
+      <div class="momentum-track">
+        <div class="momentum-knob" id="momentumKnob"></div>
+      </div>
+    </div>
+    <div class="arena" id="arena">
+      <span class="arena-corner tl"></span>
+      <span class="arena-corner tr"></span>
+      <span class="arena-corner bl"></span>
+      <span class="arena-corner br"></span>
+      <div class="team-column" id="teamAColumn"></div>
+      <div class="vs-divider">VS</div>
+      <div class="team-column" id="teamBColumn"></div>
+    </div>
+  </section>
+
+  <!-- ================= RESULTS ================= -->
+  <section id="resultsScreen" class="view">
+    <div class="results-box">
+      <h2 id="resultTitle" data-i18n="results.title">Resultat</h2>
+      <div class="result-teams" id="resultTeams"></div>
+      <button id="playAgainBtn" class="btn btn-primary btn-lg" data-i18n="results.playAgain">Rejouer</button>
+    </div>
+  </section>
+
+  <!-- ================= LEADERBOARD ================= -->
+  <section id="leaderboard" class="view">
+    <div class="arcade-topline" style="margin-bottom:28px;">
+      <span class="blip-dot"></span>
+      <span class="arcade-topline-text" data-i18n="lb.title">Classement</span>
+      <span class="arcade-topline-sep">//</span>
+      <span class="arcade-topline-text2" data-i18n="lb.subtitle">Classe par points (victoire = 3, egalite = 1), puis par taux de victoire.</span>
+    </div>
+
+    <div class="podium" id="leaderboardPodium"></div>
+
+    <div class="panel leaderboard-panel">
+      <div class="leaderboard-table" id="leaderboardTable">
+        <div class="lb-row lb-head">
+          <span class="lb-rank">#</span>
+          <span class="lb-player" data-i18n="lb.player">Joueur</span>
+          <span data-i18n="lb.pts">Pts</span>
+          <span data-i18n="lb.record">V-N-D</span>
+          <span data-i18n="lb.winrate">Victoires %</span>
+          <span data-i18n="lb.avgPnl">PnL moy.</span>
+          <span data-i18n="lb.bestPnl">Meilleur PnL</span>
+        </div>
+        <div id="leaderboardBody"></div>
+        <p id="leaderboardEmpty" class="hint hidden" data-i18n="lb.empty">Aucun match joue pour l'instant. Sois le premier a jouer !</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PROFILE ================= -->
+  <section id="profile" class="view">
+    <div class="arcade-topline" style="margin-bottom:28px;">
+      <span class="blip-dot"></span>
+      <span class="arcade-topline-text" data-i18n="profile.title">Mon profil</span>
+      <span class="arcade-topline-sep">//</span>
+      <span class="arcade-topline-text2" data-i18n="profile.subtitle">Personnalise ton identite de trader.</span>
+    </div>
+
+    <div class="profile-grid">
+      <div class="panel profile-form-panel">
+        <div class="avatar-editor">
+          <img id="avatarPreview" class="avatar-lg" src="" alt="">
+          <div>
+            <label class="btn btn-outline" for="avatarInput" data-i18n="profile.changePhoto">Changer la photo</label>
+            <input type="file" id="avatarInput" accept="image/*" class="hidden">
+            <p class="hint" style="margin:10px 0 0;" data-i18n="profile.photoHint">JPG/PNG, redimensionne automatiquement.</p>
+          </div>
+        </div>
+
+        <label class="field">
+          <span data-i18n="profile.displayName">Pseudo affiche</span>
+          <input type="text" id="profileDisplayName" maxlength="24">
+        </label>
+
+        <label class="field">
+          <span data-i18n="profile.bio">Bio</span>
+          <textarea id="profileBio" maxlength="280" rows="3"></textarea>
+        </label>
+
+        <div class="socials-grid">
+          <label class="field">
+            <span>X (Twitter)</span>
+            <input type="text" id="profileX" data-i18n-placeholder="profile.handlePlaceholder" placeholder="@pseudo (optionnel)">
+          </label>
+          <label class="field">
+            <span data-i18n="profile.instagram">Instagram</span>
+            <input type="text" id="profileInstagram" data-i18n-placeholder="profile.handlePlaceholder" placeholder="@pseudo (optionnel)">
+          </label>
+          <label class="field">
+            <span data-i18n="profile.tiktok">TikTok</span>
+            <input type="text" id="profileTiktok" data-i18n-placeholder="profile.handlePlaceholder" placeholder="@pseudo (optionnel)">
+          </label>
+        </div>
+
+        <p class="form-error" id="profileError"></p>
+        <p class="form-success" id="profileSuccess"></p>
+        <button id="saveProfileBtn" class="btn btn-primary btn-lg" data-i18n="profile.save">Enregistrer</button>
+      </div>
+
+      <aside class="panel profile-stats-panel">
+        <h3 data-i18n="profile.stats">Statistiques</h3>
+        <div class="stat-grid">
+          <div class="stat-tile"><strong class="stat-tile-value" id="statMatches">0</strong><span class="stat-tile-label" data-i18n="profile.matches">Matchs joues</span></div>
+          <div class="stat-tile stat-tile-green"><strong class="stat-tile-value" id="statWins">0</strong><span class="stat-tile-label" data-i18n="profile.wins">Victoires</span></div>
+          <div class="stat-tile stat-tile-red"><strong class="stat-tile-value" id="statLosses">0</strong><span class="stat-tile-label" data-i18n="profile.losses">Defaites</span></div>
+          <div class="stat-tile"><strong class="stat-tile-value" id="statDraws">0</strong><span class="stat-tile-label" data-i18n="profile.draws">Egalites</span></div>
+          <div class="stat-tile stat-tile-yellow"><strong class="stat-tile-value" id="statPoints">0</strong><span class="stat-tile-label" data-i18n="profile.points">Points</span></div>
+          <div class="stat-tile"><strong class="stat-tile-value" id="statAvgPnl">0%</strong><span class="stat-tile-label" data-i18n="profile.avgPnl">PnL moyen</span></div>
+          <div class="stat-tile"><strong class="stat-tile-value" id="statBestPnl">0%</strong><span class="stat-tile-label" data-i18n="profile.bestPnl">Meilleur PnL</span></div>
+          <div class="stat-tile"><strong class="stat-tile-value" id="statNetCash">$0</strong><span class="stat-tile-label" data-i18n="profile.netCash">Gains nets (Cash)</span></div>
+        </div>
+
+        <hr>
+        <h3 data-i18n="profile.walletLinked">Wallet lie</h3>
+        <p id="profileWallet" class="hint" data-i18n="wallet.noneLinked">Aucun wallet connecte</p>
+
+        <button id="profileLogoutBtn" class="btn btn-outline btn-block" data-i18n="profile.logout">Se deconnecter</button>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ================= BATTLE ROYALE SEARCHING ================= -->
+  <section id="brSearching" class="view">
+    <div class="searching-box">
+      <div class="spinner"></div>
+      <h2 data-i18n="br.searchTitle">Recherche de joueurs...</h2>
+      <p id="brSearchInfo">0 / 15 joueurs prets</p>
+      <button id="brCancelBtn" class="btn btn-outline" data-i18n="br.cancel">Annuler</button>
+    </div>
+  </section>
+
+  <!-- ================= BATTLE ROYALE MATCH ================= -->
+  <section id="brMatchScreen" class="view">
+    <div class="br-header">
+      <div>
+        <div class="mode-label" data-i18n="br.label">Battle Royale</div>
+        <div id="brAliveCount" class="br-alive-count">15 en vie</div>
+      </div>
+      <div class="timer-box">
+        <div id="brTimer">30:00</div>
+        <div class="mode-label" id="brNextElimination">Prochaine elimination dans 02:00</div>
+      </div>
+    </div>
+    <div class="br-grid" id="brGrid"></div>
+  </section>
+
+  <!-- ================= BATTLE ROYALE RESULTS ================= -->
+  <section id="brResultsScreen" class="view">
+    <div class="results-box">
+      <h2 data-i18n="br.resultsTitle">Battle Royale termine !</h2>
+      <div class="podium" id="brPodium"></div>
+      <div class="br-full-ranking" id="brFullRanking"></div>
+      <button id="brPlayAgainBtn" class="btn btn-primary btn-lg" data-i18n="br.playAgain">Retour au lobby</button>
+    </div>
+  </section>
+
+  <!-- ================= PLAYERS SEARCH ================= -->
+  <section id="players" class="view">
+    <div class="arcade-topline" style="margin-bottom:28px;">
+      <span class="blip-dot"></span>
+      <span class="arcade-topline-text" data-i18n="players.title">Joueurs</span>
+      <span class="arcade-topline-sep">//</span>
+      <span class="arcade-topline-text2" data-i18n="players.subtitle">Recherche un trader par pseudo ou par adresse wallet.</span>
+    </div>
+    <div class="panel" id="playersPanel">
+      <div class="search-bar">
+        <input type="text" id="playerSearchInput" data-i18n-placeholder="players.searchPlaceholder" placeholder="Pseudo ou adresse wallet...">
+        <button id="playerSearchBtn" class="btn btn-primary" data-i18n="players.search">Rechercher</button>
+      </div>
+      <p id="playerSearchEmpty" class="hint hidden" data-i18n="players.empty" style="margin-top:0; margin-bottom:16px;">Aucun joueur trouve.</p>
+      <div id="playerSearchResults" class="search-results"></div>
+    </div>
+  </section>
+
+  <!-- ================= PUBLIC PROFILE ================= -->
+  <section id="publicProfile" class="view">
+    <button id="backFromPublicProfile" class="btn btn-outline" style="margin-bottom:20px;" data-i18n="common.back">← Retour</button>
+    <div class="profile-grid">
+      <div class="panel public-profile-panel">
+        <img id="publicAvatar" class="avatar-lg public-avatar-lg" src="" alt="">
+        <h2 id="publicDisplayName"></h2>
+        <p id="publicBio" class="hint"></p>
+        <div class="socials-row" id="publicSocials"></div>
+        <p class="hint" id="publicWallet"></p>
+        <button id="challengeBtn" class="btn btn-primary btn-lg" data-i18n="public.challenge">Defier en 1v1</button>
+        <p class="hint" id="challengeSelfHint"></p>
+      </div>
+      <aside class="panel profile-stats-panel">
+        <h3 data-i18n="profile.stats">Statistiques</h3>
+        <div class="stat-grid">
+          <div class="stat-tile"><strong class="stat-tile-value" id="publicStatMatches"></strong><span class="stat-tile-label" data-i18n="profile.matches">Matchs joues</span></div>
+          <div class="stat-tile stat-tile-green"><strong class="stat-tile-value" id="publicStatWins"></strong><span class="stat-tile-label" data-i18n="profile.wins">Victoires</span></div>
+          <div class="stat-tile stat-tile-red"><strong class="stat-tile-value" id="publicStatLosses"></strong><span class="stat-tile-label" data-i18n="profile.losses">Defaites</span></div>
+          <div class="stat-tile"><strong class="stat-tile-value" id="publicStatDraws"></strong><span class="stat-tile-label" data-i18n="profile.draws">Egalites</span></div>
+          <div class="stat-tile stat-tile-yellow"><strong class="stat-tile-value" id="publicStatPoints"></strong><span class="stat-tile-label" data-i18n="profile.points">Points</span></div>
+          <div class="stat-tile"><strong class="stat-tile-value" id="publicStatAvgPnl"></strong><span class="stat-tile-label" data-i18n="profile.avgPnl">PnL moyen</span></div>
+          <div class="stat-tile"><strong class="stat-tile-value" id="publicStatBestPnl"></strong><span class="stat-tile-label" data-i18n="profile.bestPnl">Meilleur PnL</span></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+</main>
+
+<!-- ================= AUTH MODAL ================= -->
+<div class="modal-overlay hidden" id="authModal">
+  <div class="modal">
+    <button class="modal-close" id="closeAuthModal">&times;</button>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="login" data-i18n="auth.login">Connexion</button>
+      <button class="tab-btn" data-tab="register" data-i18n="auth.register">Inscription</button>
+    </div>
+
+    <form id="loginForm" class="auth-form">
+      <label class="field"><span data-i18n="auth.username">Pseudo</span><input type="text" id="loginUsername" required autocomplete="username"></label>
+      <label class="field"><span data-i18n="auth.password">Mot de passe</span><input type="password" id="loginPassword" required autocomplete="current-password"></label>
+      <p class="form-error" id="loginError"></p>
+      <button type="submit" class="btn btn-primary btn-lg btn-block" data-i18n="auth.loginBtn">Se connecter</button>
+      <button type="button" class="link-btn" id="showForgotPasswordBtn" data-i18n="auth.forgot">Mot de passe ou pseudo oublie ?</button>
+    </form>
+
+    <form id="registerForm" class="auth-form hidden">
+      <label class="field"><span data-i18n="auth.username">Pseudo</span><input type="text" id="registerUsername" required data-i18n-placeholder="auth.usernamePlaceholder" placeholder="3-20 caracteres" autocomplete="username"></label>
+      <label class="field"><span data-i18n="auth.password">Mot de passe</span><input type="password" id="registerPassword" required data-i18n-placeholder="auth.passwordPlaceholder" placeholder="6 caracteres min." autocomplete="new-password"></label>
+      <label class="field">
+        <span data-i18n="auth.customWord">Ton 6e mot secret (a toi de le choisir)</span>
+        <input type="text" id="registerCustomWord" required minlength="2" maxlength="30" data-i18n-placeholder="auth.customWordPlaceholder" placeholder="Ex: monchatMinou42" autocomplete="off">
+      </label>
+      <p class="hint" style="text-align:left; margin-top:-8px;" data-i18n="auth.customWordHint">5 mots te seront donnes automatiquement, et tu ajoutes ce 6e mot toi-meme. Il sera necessaire avec les 5 autres pour reinitialiser ton compte.</p>
+      <p class="form-error" id="registerError"></p>
+      <button type="submit" class="btn btn-primary btn-lg btn-block" data-i18n="auth.registerBtn">Creer mon compte</button>
+    </form>
+  </div>
+</div>
+
+<!-- ================= MOTS SECRETS (affichage) ================= -->
+<div class="modal-overlay hidden" id="recoveryWordsModal">
+  <div class="modal modal-wide" style="text-align:center;">
+    <h3 data-i18n="recovery.title">Note bien ces 5 mots secrets</h3>
+    <p class="hint cash-real-warning" data-i18n="recovery.warning">Ils permettent de reinitialiser ton mot de passe et ton pseudo si tu les oublies. Ils ne seront plus jamais affiches — note-les des maintenant quelque part en lieu sur.</p>
+    <div class="recovery-words-box" id="recoveryWordsList"></div>
+    <p class="hint" style="margin:14px 0 4px;" data-i18n="recovery.plusYourWord">+ ton 6e mot personnalise :</p>
+    <div class="recovery-words-box" id="recoveryCustomWordBox" style="grid-template-columns:1fr;"></div>
+    <button id="recoveryWordsConfirmBtn" class="btn btn-primary btn-lg btn-block" data-i18n="recovery.confirm">J'ai bien note ces mots</button>
+  </div>
+</div>
+
+<!-- ================= MOT DE PASSE OUBLIE ================= -->
+<div class="modal-overlay hidden" id="forgotPasswordModal">
+  <div class="modal modal-wide">
+    <button class="modal-close" id="closeForgotPasswordModal">&times;</button>
+    <h3 data-i18n="forgot.title">Reinitialiser ton compte</h3>
+    <p class="hint" style="text-align:left; margin:-8px 0 16px;" data-i18n="forgot.hint">Entre tes 5 mots secrets (recus a la creation du compte) dans l'ordre.</p>
+    <div class="recovery-input-row">
+      <input type="text" id="recoveryWord1" data-i18n-placeholder="recovery.word1" placeholder="Mot 1">
+      <input type="text" id="recoveryWord2" data-i18n-placeholder="recovery.word2" placeholder="Mot 2">
+      <input type="text" id="recoveryWord3" data-i18n-placeholder="recovery.word3" placeholder="Mot 3">
+      <input type="text" id="recoveryWord4" data-i18n-placeholder="recovery.word4" placeholder="Mot 4">
+      <input type="text" id="recoveryWord5" data-i18n-placeholder="recovery.word5" placeholder="Mot 5">
+    </div>
+    <label class="field">
+      <span data-i18n="forgot.yourWord">+ ton 6e mot personnalise</span>
+      <input type="text" id="recoveryWord6" class="recovery-custom-word-input" data-i18n-placeholder="auth.customWordPlaceholder" placeholder="Ex: monchatMinou42">
+    </label>
+    <label class="field"><span data-i18n="forgot.newPassword">Nouveau mot de passe</span><input type="password" id="recoveryNewPassword" data-i18n-placeholder="auth.passwordPlaceholder" placeholder="6 caracteres min." autocomplete="new-password"></label>
+    <label class="field"><span data-i18n="forgot.newUsername">Nouveau pseudo (optionnel)</span><input type="text" id="recoveryNewUsername" data-i18n-placeholder="forgot.newUsernamePlaceholder" placeholder="Laisse vide pour garder l'actuel"></label>
+    <label class="field">
+      <span data-i18n="forgot.newCustomWord">Nouveau 6e mot personnalise (pour la prochaine fois)</span>
+      <input type="text" id="recoveryNewCustomWord" minlength="2" maxlength="30" data-i18n-placeholder="auth.customWordPlaceholder" placeholder="Ex: monchatMinou42">
+    </label>
+    <p class="form-error" id="recoveryError"></p>
+    <button id="recoverySubmitBtn" class="btn btn-primary btn-lg btn-block" data-i18n="forgot.submit">Reinitialiser mon compte</button>
+  </div>
+</div>
+
+<!-- ================= WALLET MODAL ================= -->
+<div class="modal-overlay hidden" id="walletModal">
+  <div class="modal">
+    <button class="modal-close" id="closeWalletModal">&times;</button>
+    <h3 data-i18n="wallet.modalTitle">Connecter un wallet</h3>
+    <p class="hint" style="margin:-8px 0 18px;" data-i18n="wallet.modalHint">Lecture seule : on suit juste le solde de l'adresse pour calculer ton PnL, aucune signature n'est demandee.</p>
+    <button id="phantomConnectBtn" class="btn btn-primary btn-lg btn-block" data-i18n="wallet.connectPhantom">Connecter avec Phantom</button>
+    <div class="or-divider" data-i18n="wallet.or">ou</div>
+    <label class="field">
+      <span data-i18n="wallet.pasteAddress">Coller une adresse Solana publique</span>
+      <input type="text" id="manualWalletInput" data-i18n-placeholder="wallet.addressExample" placeholder="Ex: 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU">
+    </label>
+    <p class="form-error" id="walletModalError"></p>
+    <button id="manualWalletBtn" class="btn btn-outline btn-block" data-i18n="wallet.useAddress">Utiliser cette adresse</button>
+  </div>
+</div>
+
+<!-- ================= CHALLENGE (envoi) ================= -->
+<div class="modal-overlay hidden" id="challengeModal">
+  <div class="modal">
+    <button class="modal-close" id="closeChallengeModal">&times;</button>
+    <h3><span data-i18n="challenge.title">Defier</span> <span id="challengeTargetName"></span></h3>
+    <p class="hint" style="margin:-8px 0 16px;" data-i18n="challenge.chooseDuration">Choisis la duree du duel.</p>
+    <div class="chip-row" id="challengeDurationRow">
+      <button class="chip" data-duration="1m">1 min</button>
+      <button class="chip" data-duration="5m">5 min</button>
+      <button class="chip" data-duration="10m">10 min</button>
+      <button class="chip" data-duration="15m">15 min</button>
+      <button class="chip" data-duration="30m">30 min</button>
+      <button class="chip" data-duration="1h" data-i18n="duration.1h">1 heure</button>
+    </div>
+    <h4 class="preview-block-label" style="text-align:left; margin-top:18px;" data-i18n="stake.title">Format de mise</h4>
+    <div class="stake-switch" id="challengeStakeSwitch">
+      <button class="stake-switch-opt selected" data-stake-mode="free" data-i18n="stake.free">Gratuit</button>
+      <button class="stake-switch-opt" data-stake-mode="cash"><svg class="inline-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><line x1="5" y1="8" x2="11" y2="8"/></svg><span data-i18n="stake.cash">Cash (argent reel · USDT)</span></button>
+    </div>
+    <p class="hint cash-real-warning hidden" id="challengeCashWarning" data-i18n="stake.realMoneyWarning">Argent reel : chaque mise est une transaction USDT reelle et irreversible. Une commission de 15% est prelevee sur le pot du vainqueur.</p>
+    <p class="form-error" id="challengeModalError"></p>
+    <button id="sendChallengeBtn" class="btn btn-primary btn-lg btn-block" disabled data-i18n="challenge.send">Envoyer le defi</button>
+  </div>
+</div>
+
+<!-- ================= CHALLENGE (attente) ================= -->
+<div class="modal-overlay hidden" id="challengeWaitingModal">
+  <div class="modal" style="text-align:center;">
+    <div class="spinner" style="margin:0 auto 16px;"></div>
+    <h3 data-i18n="challenge.sentTitle">Defi envoye</h3>
+    <p class="hint" id="challengeWaitingText" data-i18n="challenge.waitingDefault">En attente de reponse...</p>
+    <button id="cancelChallengeWaitBtn" class="btn btn-outline btn-block" data-i18n="challenge.close">Fermer</button>
+  </div>
+</div>
+
+<!-- ================= CHALLENGE (reception) ================= -->
+<div class="modal-overlay hidden" id="incomingChallengeModal">
+  <div class="modal" style="text-align:center;">
+    <img id="incomingChallengeAvatar" class="avatar-lg" style="width:64px;height:64px;margin:0 auto 12px;" src="" alt="">
+    <h3><span id="incomingChallengeName"></span> <span data-i18n="challenge.incomingTitle">te defie en 1v1</span></h3>
+    <p class="hint" id="incomingChallengeDuration"></p>
+    <p class="hint cash-real-warning hidden" id="incomingChallengeCashBadge" data-i18n="challenge.cashIncoming">Ce defi est en argent reel (USDT) — tu choisiras ta mise si tu acceptes.</p>
+    <p class="hint" id="incomingChallengeCountdown"></p>
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button id="declineChallengeBtn" class="btn btn-outline btn-block" data-i18n="challenge.decline">Refuser</button>
+      <button id="acceptChallengeBtn" class="btn btn-primary btn-block" data-i18n="challenge.accept">Accepter</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= BR ELIMINATION ================= -->
+<div class="modal-overlay hidden" id="brEliminatedModal">
+  <div class="modal" style="text-align:center;">
+    <h3 data-i18n="brElim.title">Tu es elimine !</h3>
+    <p class="hint" id="brEliminatedRank" style="font-size:16px;"></p>
+    <div style="display:flex; flex-direction:column; gap:10px; margin-top:16px;">
+      <button id="brSpectateBtn" class="btn btn-outline btn-block" data-i18n="brElim.spectate">Regarder la suite</button>
+      <button id="brLeaveBtn" class="btn btn-primary btn-lg btn-block" data-i18n="brElim.leave">Retourner au lobby</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= DEPOT DE MISE (modes equipe) ================= -->
+<div class="modal-overlay hidden" id="cashDepositModal">
+  <div class="modal" style="text-align:center;">
+    <h3 data-i18n="cash.chooseStake">Choisis ta mise</h3>
+    <p class="hint cash-real-warning" data-i18n="cash.realMoneyWarningTeam">Argent reel — transaction irreversible. Une commission de 15% est prelevee sur le pot au moment du paiement.</p>
+    <p class="hint" id="cashDepositMatchInfo"></p>
+    <div class="stake-amount-row" style="justify-content:center;">
+      <div class="chip-row" id="cashDepositAmountRow">
+        <button class="chip" data-stake="1">1$</button>
+        <button class="chip" data-stake="5">5$</button>
+        <button class="chip" data-stake="10">10$</button>
+        <button class="chip" data-stake="25">25$</button>
+      </div>
+      <div class="custom-stake-input">
+        <span>$</span>
+        <input type="number" id="customCashDepositInput" min="1" step="1" data-i18n-placeholder="cash.customAmountPlaceholder" placeholder="Autre montant">
+      </div>
+    </div>
+    <p class="hint"><span data-i18n="cash.potInProgress">Pot en cours :</span> <strong id="cashPotAmount">$0</strong></p>
+    <div id="cashLobbyList" class="cash-lobby-list"></div>
+    <p class="hint" id="cashDepositCountdown"></p>
+    <p class="form-error" id="cashDepositError"></p>
+    <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+      <button id="cashDepositAcceptBtn" class="btn btn-primary btn-lg btn-block" disabled data-i18n="cash.acceptAndJoin">Miser et rejoindre</button>
+      <button id="cashDepositDeclineBtn" class="btn btn-outline btn-block" data-i18n="cash.decline">Refuser</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MISE BATTLE ROYALE ================= -->
+<div class="modal-overlay hidden" id="brStakeModal">
+  <div class="modal" style="text-align:center;">
+    <h3 data-i18n="cash.chooseStake">Choisis ta mise</h3>
+    <p class="hint cash-real-warning" data-i18n="br.realMoneyWarning">Argent reel — transaction irreversible. 15% de commission sera prelevee sur le pot au moment du paiement au vainqueur.</p>
+    <p class="hint"><span data-i18n="br.commonPot">Pot commun (le gagnant remporte tout) :</span> <strong id="brStakePotAmount">$0</strong></p>
+    <div class="stake-amount-row" style="justify-content:center;">
+      <div class="chip-row" id="brStakeAmountRow">
+        <button class="chip" data-stake="1">1$</button>
+        <button class="chip" data-stake="5">5$</button>
+        <button class="chip" data-stake="10">10$</button>
+        <button class="chip" data-stake="25">25$</button>
+      </div>
+      <div class="custom-stake-input">
+        <span>$</span>
+        <input type="number" id="customBrStakeInput" min="1" step="1" data-i18n-placeholder="cash.customAmountPlaceholder" placeholder="Autre montant">
+      </div>
+    </div>
+    <div id="brStakeLobbyList" class="cash-lobby-list"></div>
+    <p class="hint" id="brStakeCountdown"></p>
+    <p class="form-error" id="brStakeError"></p>
+    <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+      <button id="brStakeConfirmBtn" class="btn btn-primary btn-lg btn-block" data-i18n="cash.acceptAndJoin">Miser et rejoindre</button>
+      <button id="brStakeDeclineBtn" class="btn btn-outline btn-block" data-i18n="cash.withdraw">Me retirer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ANNULATION MISE ================= -->
+<div class="modal-overlay hidden" id="cashCancelledModal">
+  <div class="modal" style="text-align:center;">
+    <h3 data-i18n="cash.cancelledTitle">Match annule</h3>
+    <p class="hint" id="cashCancelledReason"></p>
+    <button id="cashCancelledOkBtn" class="btn btn-primary btn-lg btn-block" data-i18n="cash.backToLobby">Retour au lobby</button>
+  </div>
+</div>
+
+
+<footer id="discordFooter" style="position:fixed; bottom:20px; right:20px; z-index:10;">
+  <a href="https://discord.gg/B2euCT5Xga" target="_blank" rel="noopener" style="display:flex; align-items:center; gap:8px; padding:10px 16px; background:#5865F2; border-radius:6px; color:#fff; text-decoration:none; font-size:14px; opacity:0.75; transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.75'">
+    Discord
+  </a>
+</footer>
+
+<script src="https://unpkg.com/@solana/web3.js@1.95.3/lib/index.iife.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

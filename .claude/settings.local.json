@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(netstat -ano)",
+      "Bash(npm start *)",
+      "PowerShell(Get-Process -Name node -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Force)",
+      "PowerShell(Stop-Process -Name node -Force -ErrorAction SilentlyContinue)",
+      "Bash(node \"C:\\\\Users\\\\marcs\\\\OneDrive\\\\Moi\\\\Arvon\\\\create-admin.js\")",
+      "Bash(npm install *)",
+      "Bash(Start-Sleep -Seconds 3)",
+      "PowerShell(Get-Process node -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Force -ErrorAction SilentlyContinue)",
+      "Bash(pkill -f \"npm start\")",
+      "Bash(awk '{print $2}')",
+      "Bash(xargs kill -9)",
+      "PowerShell(Get-Process | Where-Object {$_.Name -match \"node\"} | Stop-Process -Force)",
+      "PowerShell(Get-Process | Where-Object {$_.Name -match \"node\"} | Stop-Process -Force 2>$null; Start-Sleep -Milliseconds 500; cd \"C:\\\\Users\\\\marcs\\\\OneDrive\\\\Moi\\\\Arvon\" ; npm start)",
+      "PowerShell(Get-Process | Where-Object {$_.Name -match \"node\"} | Stop-Process -Force 2>$null; Start-Sleep -Milliseconds 500; cd \"C:\\\\Users\\\\marcs\\\\OneDrive\\\\Moi\\\\Arvon\" ; npm start 2>&1 | Tee-Object -FilePath \"$env:TEMP\\\\arvon_server.log\" -Append)",
+      "PowerShell(Get-Process | Where-Object {$_.Name -match \"node\"} | Stop-Process -Force 2>$null; Start-Sleep -Milliseconds 500; cd \"C:\\\\Users\\\\marcs\\\\OneDrive\\\\Moi\\\\Arvon\" ; npm start 2>&1 | Select-Object -First 20)"
+    ]
+  }
+}
