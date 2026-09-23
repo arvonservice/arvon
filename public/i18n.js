@@ -58,7 +58,6 @@ const I18N = {
     'br.rule1': 'Duree maximum : 30 minutes',
     'br.rule2': 'Toutes les 2 minutes, le PnL % le plus bas est elimine',
     'br.rule3': 'Dernier survivant = vainqueur (empoche tout le pot en mode Cash)',
-    'br.rule4': 'Une fois elimine, tu peux regarder la suite ou retourner au lobby',
     'br.searchTitle': 'Recherche de joueurs...',
     'br.cancel': 'Annuler',
     'br.label': 'Battle Royale',
