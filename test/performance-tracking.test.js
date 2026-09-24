@@ -342,6 +342,55 @@ test('26. Le SOL immobilise en rent reste dans l equity', () => {
   assert.strictEqual(round2(rentRow.value), 0.2);
 });
 
+// -------- Contre-verification des prix (DexScreener) --------
+
+const { arbitrate, bestPairByMint } = require('../lib/pricecheck');
+const ref = (spec) => new Map(Object.entries(spec));
+
+test('27. Sources concordantes -> on garde le prix primaire', () => {
+  const v = arbitrate(TOK_A, 100, ref({ [TOK_A]: { price: 103, liquidityUsd: 500000 } }));
+  assert.strictEqual(v.source, 'jupiter');
+  assert.ok(v.divergence <= 0.1);
+});
+
+test('28. Divergence forte sur un pool liquide -> la reference l emporte', () => {
+  const v = arbitrate(TOK_A, 0.00003046, ref({ [TOK_A]: { price: 0.000002683, liquidityUsd: 50000 } }));
+  assert.strictEqual(v.source, 'dexscreener');
+  assert.strictEqual(v.price, 0.000002683);
+  assert.ok(v.divergence > 0.9);
+});
+
+test('29. Divergence sur un pool illiquide -> ignoree', () => {
+  const v = arbitrate(TOK_A, 0.001, ref({ [TOK_A]: { price: 0.05, liquidityUsd: 12 } }));
+  assert.strictEqual(v.source, 'jupiter');
+  assert.strictEqual(v.price, 0.001);
+  assert.match(v.reason, /liquidite/);
+});
+
+test('30. Primaire absent + reference liquide -> l actif est sauve', () => {
+  const v = arbitrate(TOK_NEW, null, ref({ [TOK_NEW]: { price: 0.42, liquidityUsd: 80000 } }));
+  assert.strictEqual(v.source, 'dexscreener');
+  assert.strictEqual(v.price, 0.42);
+});
+
+test('31. Aucune reference -> aucun arbitrage', () => {
+  assert.strictEqual(arbitrate(TOK_A, 5, ref({})), null);
+});
+
+test('32. On retient la paire la plus liquide, et seulement en jeton de base', () => {
+  const best = bestPairByMint(
+    [
+      { baseToken: { address: TOK_A, symbol: 'A' }, priceUsd: '1.00', liquidity: { usd: 1000 }, dexId: 'raydium' },
+      { baseToken: { address: TOK_A, symbol: 'A' }, priceUsd: '1.30', liquidity: { usd: 90000 }, dexId: 'orca' },
+      { baseToken: { address: TOK_B, symbol: 'B' }, priceUsd: '9.99', liquidity: { usd: 99999 }, dexId: 'meteora' },
+    ],
+    [TOK_A]
+  );
+  assert.strictEqual(best.size, 1, 'un mint non demande ne doit pas etre retenu');
+  assert.strictEqual(best.get(TOK_A).price, 1.3);
+  assert.strictEqual(best.get(TOK_A).dex, 'orca');
+});
+
 // --------------------------------------------------------------------------
 
 (async () => {

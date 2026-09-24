@@ -31,21 +31,26 @@ function pad(s, n) {
   console.log(`Latence  ${Date.now() - started} ms`);
   console.log(`Actifs   ${v.breakdown.length} (dont ${snapshot.assets.filter((a) => a.program === 'token-2022').length} Token-2022)\n`);
 
-  console.log(pad('ACTIF', 46), pad('MONTANT', 20), pad('PRIX', 16), pad('STATUT', 9), pad('SRC', 14), 'VALEUR USD');
-  console.log('-'.repeat(130));
+  console.log(pad('ACTIF', 46), pad('MONTANT', 18), pad('PRIX RETENU', 16), pad('SOURCE', 12), pad('VALEUR USD', 12), 'CONTRE-VERIFICATION');
+  console.log('-'.repeat(160));
   const rows = v.breakdown.slice().sort((a, b) => (b.value || 0) - (a.value || 0));
   for (const b of rows) {
+    const cc = prices.get(b.mint)?.crossCheck;
+    const note = !cc
+      ? 'aucune reference'
+      : `${cc.source} | ecart ${cc.divergence === null ? 'n/a' : (cc.divergence * 100).toFixed(1) + '%'}` +
+        ` | ref ${cc.referencePrice} | liq $${Math.round(cc.liquidityUsd)}`;
     console.log(
       pad(b.label || b.mint, 46),
-      pad(b.amount, 20),
+      pad(b.amount, 18),
       pad(b.price === null ? 'NON COTE' : b.price, 16),
-      pad(b.priceStatus, 9),
-      pad(b.priceSource, 14),
-      b.value === null ? '—' : b.value.toFixed(6)
+      pad(b.priceStatus, 12),
+      pad(b.value === null ? '—' : b.value.toFixed(6), 12),
+      note
     );
   }
-  console.log('-'.repeat(130));
-  console.log(`${pad('EQUITY TOTALE', 46)} ${pad('', 20)} ${pad('', 16)} ${pad('', 9)} ${pad('', 14)} ${v.equity.toFixed(6)}`);
+  console.log('-'.repeat(160));
+  console.log(`${pad('EQUITY TOTALE', 46)} ${pad('', 18)} ${pad('', 16)} ${pad('', 12)} ${pad(v.equity.toFixed(6), 12)}`);
   console.log(`\nCouverture de prix : ${(v.coverage * 100).toFixed(1)}%`);
 
   if (v.unpricedAssets.length) {
