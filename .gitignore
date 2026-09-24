@@ -9,3 +9,6 @@ server.log
 
 # Dossier imprimable : regenerable via tools/build-dossier.js
 dossier-tracking-performance.html
+
+# Recap Word : regenerable via tools/build-recap-docx.js
+Arvon-recap-tracking-performance.docx
