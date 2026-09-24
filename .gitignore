@@ -6,3 +6,6 @@ logs/
 
 server.log
 *.log
+
+# Dossier imprimable : regenerable via tools/build-dossier.js
+dossier-tracking-performance.html
