@@ -5,7 +5,9 @@
   "description": "Arvon - PvP de trading memecoin en temps reel (1v1 a 5v5, Battle Royale) base sur le PnL en pourcentage",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "node test/performance-tracking.test.js",
+    "inspect-wallet": "node tools/inspect-wallet.js"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",

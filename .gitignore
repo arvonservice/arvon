@@ -1,0 +1,8 @@
+node_modules/
+
+# Diagnostics de match : generes a l'execution, contiennent des adresses de
+# wallet. A consulter sur le serveur, pas a versionner.
+logs/
+
+server.log
+*.log

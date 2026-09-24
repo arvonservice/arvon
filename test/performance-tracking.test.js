@@ -1,311 +1,368 @@
-const { snapshotTotal, SOL_MINT } = require('../lib/solana');
+// Tests du pipeline de performance. Aucun acces reseau : on injecte des
+// snapshots et des cartes de prix synthetiques.
 
-// Test utilities
-function round2(n) {
-  return Math.round(n * 100) / 100;
-}
+const assert = require('assert');
+const { valueSnapshot, PerformanceTracker, round2 } = require('../lib/performance');
+const { STATUS } = require('../lib/pricing');
+const { SOL_MINT } = require('../lib/wallet');
+const { classify, flowUsdValue, dedupeTransactions, TX_TYPE } = require('../lib/txclassify');
+const { PlayerTracker } = require('../lib/playertracker');
 
-function createSnapshot(solAmount, tokens = {}, prices = {}) {
-  const allMints = [SOL_MINT, ...Object.keys(tokens)];
-  const allPrices = { [SOL_MINT]: prices[SOL_MINT] || 150, ...prices };
+const TOK_A = 'AaaaAAAAaaaaAAAAaaaaAAAAaaaaAAAAaaaaAAAAaaa';
+const TOK_B = 'BbbbBBBBbbbbBBBBbbbbBBBBbbbbBBBBbbbbBBBBbbb';
+const TOK_NEW = 'NnnnNNNNnnnnNNNNnnnnNNNNnnnnNNNNnnnnNNNNnnn';
+const WALLET = 'Wwww1111wwww1111wwww1111wwww1111wwww1111www';
+const JUPITER = 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4';
+
+let clock = 1_700_000_000_000;
+
+function snap({ sol = 0, tokens = [] }) {
+  clock += 1000;
   return {
-    solAmount,
-    tokens,
-    prices: allPrices,
-    unpricedMints: Object.keys(allPrices).filter((m) => allPrices[m] === null),
-    timestamp: Date.now(),
+    wallet: WALLET,
+    timestamp: clock,
+    slot: 1000,
+    slots: {},
+    slotSpread: 0,
+    native: { lamports: Math.round(sol * 1e9), amount: sol },
+    assets: tokens.map((t) => ({
+      mint: t.mint,
+      raw: String(Math.round(t.amount * 10 ** (t.decimals ?? 6))),
+      decimals: t.decimals ?? 6,
+      amount: t.amount,
+      program: t.program || 'spl-token',
+      accounts: 1,
+    })),
+    errors: [],
   };
 }
 
-function calculatePnlPct(baseline, currentEquity) {
-  return baseline > 0 ? round2(((currentEquity / baseline) - 1) * 100) : 0;
-}
-
-// TESTS
-const tests = [];
-
-function test(name, fn) {
-  tests.push({ name, fn });
-}
-
-// ========== Test Cases (20 required) ==========
-
-// 1. Wallet +0% performance (no change)
-test('Wallet unchanged: 0% performance', () => {
-  const initial = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const baseline = snapshotTotal(initial);
-  const current = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const currentEquity = snapshotTotal(current);
-  const pnl = calculatePnlPct(baseline, currentEquity);
-  if (pnl !== 0) throw new Error(`Expected 0%, got ${pnl}%`);
-});
-
-// 2. Wallet +10% performance
-test('Wallet +10% performance', () => {
-  const initial = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const baseline = snapshotTotal(initial); // 1*150 + 100*10 = 1150
-  const current = createSnapshot(1.1, { TOKEN1: 110 }, { TOKEN1: 10 });
-  const currentEquity = snapshotTotal(current); // 1.1*150 + 110*10 = 1265
-  const pnl = calculatePnlPct(baseline, currentEquity);
-  const expected = round2(((1265 / 1150) - 1) * 100);
-  if (pnl !== expected) throw new Error(`Expected ${expected}%, got ${pnl}%`);
-});
-
-// 3. Wallet -10% performance
-test('Wallet -10% performance', () => {
-  const initial = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const baseline = snapshotTotal(initial); // 1150
-  const current = createSnapshot(0.9, { TOKEN1: 90 }, { TOKEN1: 10 });
-  const currentEquity = snapshotTotal(current); // 0.9*150 + 90*10 = 1035
-  const pnl = calculatePnlPct(baseline, currentEquity);
-  const expected = round2(((1035 / 1150) - 1) * 100);
-  if (pnl !== expected) throw new Error(`Expected ${expected}%, got ${pnl}%`);
-});
-
-// 4. Wallet +100% performance (doubles)
-test('Wallet +100% performance (doubles)', () => {
-  const initial = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const baseline = snapshotTotal(initial); // 1150
-  const current = createSnapshot(2, { TOKEN1: 200 }, { TOKEN1: 10 });
-  const currentEquity = snapshotTotal(current); // 2*150 + 200*10 = 2300
-  const pnl = calculatePnlPct(baseline, currentEquity);
-  if (pnl !== 100) throw new Error(`Expected 100%, got ${pnl}%`);
-});
-
-// 5. Price movement without transactions: token price doubles
-test('Price movement (token doubles): +100% without trades', () => {
-  const initial = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const baseline = snapshotTotal(initial); // 1*150 + 100*10 = 1150
-  const current = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 20 }); // token price doubled
-  const currentEquity = snapshotTotal(current); // 1*150 + 100*20 = 2150
-  const pnl = calculatePnlPct(baseline, currentEquity);
-  const expected = round2(((2150 / 1150) - 1) * 100); // ~87% gain
-  if (Math.abs(pnl - expected) > 0.01) throw new Error(`Expected ${expected}%, got ${pnl}%`);
-});
-
-// 6. Price decline: token halves in price
-test('Price decline (token halves): -50% without trades', () => {
-  const initial = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 20 });
-  const baseline = snapshotTotal(initial); // 1*150 + 100*20 = 2150
-  const current = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 10 }); // token price halved
-  const currentEquity = snapshotTotal(current); // 1*150 + 100*10 = 1150
-  const pnl = calculatePnlPct(baseline, currentEquity);
-  const expected = round2(((1150 / 2150) - 1) * 100); // ~46.5% loss
-  if (Math.abs(pnl - expected) > 0.01) throw new Error(`Expected ${expected}%, got ${pnl}%`);
-});
-
-// 7. New token purchase during match
-test('New token purchase (+10% from new asset)', () => {
-  const initial = createSnapshot(1, {}, { TOKEN1: undefined });
-  const baseline = snapshotTotal(initial); // 1*150 = 150
-  const current = createSnapshot(1, { TOKEN1: 10 }, { TOKEN1: 20 }); // bought 10 TOKEN1 @ 20
-  const currentEquity = snapshotTotal(current); // 1*150 + 10*20 = 350
-  const pnl = calculatePnlPct(baseline, currentEquity);
-  const expected = round2(((350 / 150) - 1) * 100); // ~133% gain
-  if (Math.abs(pnl - expected) > 0.01) throw new Error(`Expected ${expected}%, got ${pnl}%`);
-});
-
-// 8. Complete token sale (liquidate position)
-test('Complete token sale (liquidate position)', () => {
-  const initial = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const baseline = snapshotTotal(initial); // 1150
-  const current = createSnapshot(1.5, { TOKEN1: 0 }, { TOKEN1: 10 }); // sold all TOKEN1, bought SOL
-  const currentEquity = snapshotTotal(current); // 1.5*150 = 225
-  const pnl = calculatePnlPct(baseline, currentEquity);
-  const expected = round2(((225 / 1150) - 1) * 100); // ~80% loss
-  if (Math.abs(pnl - expected) > 0.01) throw new Error(`Expected ${expected}%, got ${pnl}%`);
-});
-
-// 9. Multiple token portfolio (3 tokens)
-test('Multiple token portfolio (3 tokens)', () => {
-  const initial = createSnapshot(
-    1,
-    { TOKEN1: 50, TOKEN2: 30, TOKEN3: 20 },
-    { TOKEN1: 10, TOKEN2: 5, TOKEN3: 2 }
-  );
-  const baseline = snapshotTotal(initial); // 1*150 + 50*10 + 30*5 + 20*2 = 150 + 500 + 150 + 40 = 840
-  const current = createSnapshot(
-    1,
-    { TOKEN1: 55, TOKEN2: 32, TOKEN3: 21 },
-    { TOKEN1: 10, TOKEN2: 5, TOKEN3: 2 }
-  );
-  const currentEquity = snapshotTotal(current); // 1*150 + 55*10 + 32*5 + 21*2 = 150 + 550 + 160 + 42 = 902
-  const pnl = calculatePnlPct(baseline, currentEquity);
-  const expected = round2(((902 / 840) - 1) * 100); // ~7.4%
-  if (Math.abs(pnl - expected) > 0.01) throw new Error(`Expected ${expected}%, got ${pnl}%`);
-});
-
-// 10. SOL-only portfolio
-test('SOL-only portfolio (+25%)', () => {
-  const initial = createSnapshot(10, {}, {});
-  const baseline = snapshotTotal(initial); // 10*150 = 1500
-  const current = createSnapshot(12.5, {}, {});
-  const currentEquity = snapshotTotal(current); // 12.5*150 = 1875
-  const pnl = calculatePnlPct(baseline, currentEquity);
-  if (pnl !== 25) throw new Error(`Expected 25%, got ${pnl}%`);
-});
-
-// 11. Token-only portfolio (no SOL)
-test('Token-only portfolio (+50%)', () => {
-  const initial = createSnapshot(0, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const baseline = snapshotTotal(initial); // 0 + 100*10 = 1000
-  const current = createSnapshot(0, { TOKEN1: 150 }, { TOKEN1: 10 });
-  const currentEquity = snapshotTotal(current); // 0 + 150*10 = 1500
-  const pnl = calculatePnlPct(baseline, currentEquity);
-  if (pnl !== 50) throw new Error(`Expected 50%, got ${pnl}%`);
-});
-
-// 12. Jupiter API unavailable: keep stale prices
-test('API failure: stale prices kept (not zeroed)', () => {
-  const initial = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const baseline = snapshotTotal(initial); // 1150
-  // Simulate stale price (API failed, kept previous price)
-  const staleSnapshot = {
-    solAmount: 1,
-    tokens: { TOKEN1: 100 },
-    prices: { [SOL_MINT]: 150, TOKEN1: 10 }, // stale price from before
-    unpricedMints: [],
-    timestamp: Date.now(),
-  };
-  const currentEquity = snapshotTotal(staleSnapshot);
-  // Should NOT zero out the price; should use the stale price
-  if (currentEquity < 1100) throw new Error(`Stale prices were zeroed, got ${currentEquity}`);
-  if (currentEquity !== 1150) throw new Error(`Expected 1150 with stale prices, got ${currentEquity}`);
-});
-
-// 13. Unpriced token handling (explicitly marked as null)
-test('Unpriced token: null price (not silently zeroed)', () => {
-  const initial = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const baseline = snapshotTotal(initial); // 1150
-  // New token with no price
-  const current = {
-    solAmount: 1,
-    tokens: { TOKEN1: 100, TOKEN2: 50 },
-    prices: { [SOL_MINT]: 150, TOKEN1: 10, TOKEN2: null }, // TOKEN2 explicitly unpriced
-    unpricedMints: ['TOKEN2'],
-    timestamp: Date.now(),
-  };
-  const currentEquity = snapshotTotal(current);
-  // Should NOT include TOKEN2 in the total
-  const expected = 1 * 150 + 100 * 10; // TOKEN2 excluded
-  if (currentEquity !== expected) throw new Error(`Expected ${expected}, got ${currentEquity}`);
-});
-
-// 14. Transfer-in scenario (external deposit, not trading gain)
-test('Transfer-in (+500 SOL deposit): gains from capital, not trading', () => {
-  const initial = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const baseline = snapshotTotal(initial); // 1150
-  // External deposit: +500 SOL
-  const current = createSnapshot(501, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const currentEquity = snapshotTotal(current); // 501*150 + 100*10 = 76650
-  const pnl = calculatePnlPct(baseline, currentEquity);
-  // 75000 / 1150 ≈ 6521% (transfer incorrectly counted as gain if not handled)
-  // Correct: should detect this is a capital flow, not trading gain
-  // For now, we just track the calculation; transfer detection is future work
-  if (pnl < 1000) throw new Error(`Transfer-in caused expected huge PnL, got ${pnl}%`);
-});
-
-// 15. Transfer-out scenario (withdrawal, reduces equity)
-test('Transfer-out (-1 SOL withdrawal): equity reduced', () => {
-  const initial = createSnapshot(10, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const baseline = snapshotTotal(initial); // 10*150 + 100*10 = 2500
-  // External withdrawal: -1 SOL
-  const current = createSnapshot(9, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const currentEquity = snapshotTotal(current); // 9*150 + 100*10 = 2350
-  const pnl = calculatePnlPct(baseline, currentEquity);
-  const expected = round2(((2350 / 2500) - 1) * 100); // -6%
-  if (Math.abs(pnl - expected) > 0.01) throw new Error(`Expected ${expected}%, got ${pnl}%`);
-});
-
-// 16. Duplicate transaction handling (same tx applied twice)
-test('Duplicate transaction: idempotent PnL', () => {
-  const initial = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const baseline = snapshotTotal(initial); // 1150
-  const afterTrade1 = createSnapshot(1, { TOKEN1: 110 }, { TOKEN1: 10 });
-  const pnl1 = calculatePnlPct(baseline, snapshotTotal(afterTrade1));
-  // Apply same trade twice
-  const afterTrade2 = createSnapshot(1, { TOKEN1: 120 }, { TOKEN1: 10 });
-  const pnl2 = calculatePnlPct(baseline, snapshotTotal(afterTrade2));
-  // PnL should reflect the actual state, not double-counted
-  if (pnl2 <= pnl1) throw new Error(`Duplicate transactions: pnl should increase monotonically`);
-});
-
-// 17. RPC timeout / price fetch failure recovery
-test('RPC timeout: fallback to stale data', () => {
-  const initial = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const baseline = snapshotTotal(initial); // 1150
-  // Simulate RPC timeout: prices from 5 minutes ago still used
-  const staleSnapshot = {
-    solAmount: 1,
-    tokens: { TOKEN1: 100 },
-    prices: { [SOL_MINT]: 150, TOKEN1: 10 }, // stale prices
-    unpricedMints: [],
-    timestamp: Date.now() - 5 * 60 * 1000, // 5 minutes old
-  };
-  const currentEquity = snapshotTotal(staleSnapshot);
-  // Should recover with stale prices, not crash
-  if (currentEquity !== 1150) throw new Error(`Expected 1150 with stale prices, got ${currentEquity}`);
-});
-
-// 18. Match end with stale final tick
-test('Match end with stale final tick: PnL finalized', () => {
-  const initial = createSnapshot(1, { TOKEN1: 100 }, { TOKEN1: 10 });
-  const baseline = snapshotTotal(initial); // 1150
-  // Final tick hasn't refreshed in 30 seconds (stale)
-  const finalSnapshot = {
-    solAmount: 1,
-    tokens: { TOKEN1: 100 },
-    prices: { [SOL_MINT]: 150, TOKEN1: 10 },
-    unpricedMints: [],
-    timestamp: Date.now() - 30 * 1000, // 30 seconds old
-  };
-  const finalEquity = snapshotTotal(finalSnapshot);
-  const finalPnl = calculatePnlPct(baseline, finalEquity);
-  // PnL should be finalized with last known prices (not crash)
-  if (isNaN(finalPnl)) throw new Error(`Final PnL is NaN (stale tick not handled)`);
-  if (finalPnl !== 0) throw new Error(`Expected 0% (unchanged), got ${finalPnl}%`);
-});
-
-// 19. Negative baseline (edge case: should return 0%)
-test('Negative baseline edge case', () => {
-  const baseline = -100; // invalid but should not crash
-  const currentEquity = 500;
-  const pnl = calculatePnlPct(baseline, currentEquity);
-  if (pnl !== 0) throw new Error(`Expected 0% for negative baseline, got ${pnl}%`);
-});
-
-// 20. Zero baseline (edge case: should return 0%)
-test('Zero baseline edge case', () => {
-  const baseline = 0;
-  const currentEquity = 500;
-  const pnl = calculatePnlPct(baseline, currentEquity);
-  if (pnl !== 0) throw new Error(`Expected 0% for zero baseline, got ${pnl}%`);
-});
-
-// ========== Run Tests ==========
-let passed = 0;
-let failed = 0;
-
-console.log('\n📊 Performance Tracking Test Suite\n');
-console.log(`Running ${tests.length} tests...\n`);
-
-tests.forEach((t, i) => {
-  try {
-    t.fn();
-    console.log(`✅ [${i + 1}] ${t.name}`);
-    passed++;
-  } catch (e) {
-    console.log(`❌ [${i + 1}] ${t.name}`);
-    console.log(`   Error: ${e.message}`);
-    failed++;
+function prices(spec) {
+  const m = new Map();
+  for (const [mint, v] of Object.entries(spec)) {
+    if (v === null) {
+      m.set(mint, { price: null, status: STATUS.UNPRICED, ageMs: null, fetchedAt: null });
+    } else if (typeof v === 'object') {
+      m.set(mint, v);
+    } else {
+      m.set(mint, { price: v, status: STATUS.FRESH, ageMs: 0, fetchedAt: clock });
+    }
   }
+  return m;
+}
+
+function equityOf(s, p, opts) {
+  return valueSnapshot(s, prices(p), opts).equity;
+}
+
+const tests = [];
+const test = (name, fn) => tests.push({ name, fn });
+const near = (a, b, eps = 0.011) => Math.abs(a - b) <= eps;
+
+// --------------------------------------------------------------------------
+
+test('1. Equity stable -> 0%', () => {
+  const s0 = snap({ sol: 10 });
+  const t = new PerformanceTracker(valueSnapshot(s0, prices({ [SOL_MINT]: 100 })));
+  assert.strictEqual(t.initialEquity, 1000);
+  const r = t.update(valueSnapshot(snap({ sol: 10 }), prices({ [SOL_MINT]: 100 })));
+  assert.strictEqual(r.pnlPct, 0);
 });
 
-console.log(`\n${passed}/${tests.length} tests passed`);
-if (failed > 0) {
-  console.log(`${failed} test(s) failed\n`);
-  process.exit(1);
-} else {
-  console.log('All tests passed! ✅\n');
-  process.exit(0);
+test('2. 1000 -> 1100 = +10%', () => {
+  const t = new PerformanceTracker(valueSnapshot(snap({ sol: 10 }), prices({ [SOL_MINT]: 100 })));
+  const r = t.update(valueSnapshot(snap({ sol: 11 }), prices({ [SOL_MINT]: 100 })));
+  assert.strictEqual(r.pnlPct, 10);
+});
+
+test('3. 1000 -> 900 = -10%', () => {
+  const t = new PerformanceTracker(valueSnapshot(snap({ sol: 10 }), prices({ [SOL_MINT]: 100 })));
+  const r = t.update(valueSnapshot(snap({ sol: 9 }), prices({ [SOL_MINT]: 100 })));
+  assert.strictEqual(r.pnlPct, -10);
+});
+
+test('4. Prix x2 sans aucune transaction -> +100%', () => {
+  const holding = { sol: 0, tokens: [{ mint: TOK_A, amount: 100 }] };
+  const t = new PerformanceTracker(valueSnapshot(snap(holding), prices({ [SOL_MINT]: 100, [TOK_A]: 1 })));
+  assert.strictEqual(t.initialEquity, 100);
+  // Quantite identique, seul le prix bouge. C'etait le bug d'origine.
+  const r = t.update(valueSnapshot(snap(holding), prices({ [SOL_MINT]: 100, [TOK_A]: 2 })));
+  assert.strictEqual(r.pnlPct, 100);
+});
+
+test('5. Prix /2 sans transaction -> -50%', () => {
+  const holding = { sol: 0, tokens: [{ mint: TOK_A, amount: 100 }] };
+  const t = new PerformanceTracker(valueSnapshot(snap(holding), prices({ [TOK_A]: 1, [SOL_MINT]: 100 })));
+  const r = t.update(valueSnapshot(snap(holding), prices({ [TOK_A]: 0.5, [SOL_MINT]: 100 })));
+  assert.strictEqual(r.pnlPct, -50);
+});
+
+test('6. Achat puis revente en perte -> -5%', () => {
+  const p = { [SOL_MINT]: 100, [TOK_A]: 1.9 };
+  const t = new PerformanceTracker(valueSnapshot(snap({ sol: 10 }), prices(p))); // 1000
+  t.update(valueSnapshot(snap({ sol: 0.05, tokens: [{ mint: TOK_A, amount: 500 }] }), prices(p))); // 955
+  const r = t.update(valueSnapshot(snap({ sol: 9.5 }), prices(p))); // 950
+  assert.strictEqual(r.pnlPct, -5); // 950/1000 - 1
+});
+
+test('7. Frais reseau : reels, donc NON neutralises', () => {
+  const t = new PerformanceTracker(valueSnapshot(snap({ sol: 10 }), prices({ [SOL_MINT]: 100 })));
+  const r = t.update(valueSnapshot(snap({ sol: 9.9 }), prices({ [SOL_MINT]: 100 })));
+  assert.strictEqual(r.pnlPct, -1);
+  assert.strictEqual(t.totalFlowUsd, 0, 'des frais ne sont pas un flux externe');
+});
+
+test('8. Depot externe sans trade -> 0% (flux neutralise)', () => {
+  const t = new PerformanceTracker(valueSnapshot(snap({ sol: 10 }), prices({ [SOL_MINT]: 100 })));
+  const r = t.update(valueSnapshot(snap({ sol: 15 }), prices({ [SOL_MINT]: 100 })), [
+    { type: TX_TYPE.TRANSFER_IN, usdValue: 500 },
+  ]);
+  assert.strictEqual(r.pnlPct, 0, 'envoyer 500$ ne doit pas valoir +50%');
+});
+
+test('9. Retrait externe sans trade -> 0%', () => {
+  const t = new PerformanceTracker(valueSnapshot(snap({ sol: 10 }), prices({ [SOL_MINT]: 100 })));
+  const r = t.update(valueSnapshot(snap({ sol: 5 }), prices({ [SOL_MINT]: 100 })), [
+    { type: TX_TYPE.TRANSFER_OUT, usdValue: -500 },
+  ]);
+  assert.strictEqual(r.pnlPct, 0, 'retirer 500$ ne doit pas valoir -50%');
+});
+
+test('10. Panne Jupiter : prix STALE conserve, aucune perte fantome', () => {
+  const holding = { sol: 0, tokens: [{ mint: TOK_A, amount: 100 }] };
+  const fresh = prices({ [SOL_MINT]: 100, [TOK_A]: 1 });
+  const t = new PerformanceTracker(valueSnapshot(snap(holding), fresh));
+  // La source ne repond plus : plus aucune cotation dans la reponse.
+  const outage = prices({ [SOL_MINT]: null, [TOK_A]: null });
+  const v = valueSnapshot(snap(holding), outage, { carryForward: t.carryForwardPrices() });
+  assert.strictEqual(v.equity, 100, 'le dernier prix connu doit etre reporte');
+  assert.strictEqual(v.breakdown.find((b) => b.mint === TOK_A).priceSource, 'carry-forward');
+  assert.strictEqual(t.update(v).pnlPct, 0);
+});
+
+test('11. Token jamais cote acquis en cours de match -> score gele', () => {
+  const t = new PerformanceTracker(valueSnapshot(snap({ sol: 10 }), prices({ [SOL_MINT]: 100 })));
+  t.update(valueSnapshot(snap({ sol: 9 }), prices({ [SOL_MINT]: 100 })));
+  assert.strictEqual(t.pnlPct, -10);
+
+  // Swap vers un token que la source ne cote pas : l'equity serait sous-evaluee.
+  const v = valueSnapshot(
+    snap({ sol: 0.1, tokens: [{ mint: TOK_NEW, amount: 5000 }] }),
+    prices({ [SOL_MINT]: 100, [TOK_NEW]: null }),
+    { carryForward: t.carryForwardPrices() }
+  );
+  const r = t.update(v);
+  assert.strictEqual(r.applied, false);
+  assert.ok(r.degraded, 'la degradation doit etre signalee');
+  assert.strictEqual(r.pnlPct, -10, 'le score ne doit pas chuter a cause d un actif non cote');
+});
+
+test('12. Erreur RPC : derniere valeur conservee, jamais de 0', async () => {
+  const pt = new PlayerTracker({ playerId: 'p1', name: 'T', wallet: 'adresse-invalide', logger: null });
+  pt.tracker = new PerformanceTracker(valueSnapshot(snap({ sol: 10 }), prices({ [SOL_MINT]: 100 })));
+  pt.tracker.update(valueSnapshot(snap({ sol: 9.2 }), prices({ [SOL_MINT]: 100 })));
+  pt.pnlPct = pt.tracker.pnlPct;
+  pt.ready = true;
+  assert.strictEqual(pt.pnlPct, -8);
+
+  const after = await pt.refresh({ force: true }); // adresse invalide -> throw -> catch
+  assert.strictEqual(after, -8, 'une panne RPC ne doit pas remettre le score a zero');
+  assert.ok(pt.error, 'l erreur doit etre exposee');
+});
+
+test('13. Token-2022 compte dans l equity', () => {
+  const v = valueSnapshot(
+    snap({ sol: 1, tokens: [{ mint: TOK_B, amount: 200, program: 'token-2022' }] }),
+    prices({ [SOL_MINT]: 100, [TOK_B]: 3 })
+  );
+  assert.strictEqual(v.equity, 100 + 600);
+  assert.strictEqual(v.breakdown.find((b) => b.mint === TOK_B).program, 'token-2022');
+});
+
+test('14. Deux tokens a prix differents', () => {
+  const holding = {
+    sol: 2,
+    tokens: [
+      { mint: TOK_A, amount: 50 },
+      { mint: TOK_B, amount: 30 },
+    ],
+  };
+  const t = new PerformanceTracker(
+    valueSnapshot(snap(holding), prices({ [SOL_MINT]: 100, [TOK_A]: 10, [TOK_B]: 5 }))
+  );
+  assert.strictEqual(t.initialEquity, 200 + 500 + 150); // 850
+  // TOK_A +20% (+100$), TOK_B -40% (-60$), SOL stable -> +40$ sur 850$
+  const r = t.update(valueSnapshot(snap(holding), prices({ [SOL_MINT]: 100, [TOK_A]: 12, [TOK_B]: 3 })));
+  assert.strictEqual(r.pnlPct, 4.71); // 890/850 - 1
+});
+
+test('15. Snapshot final different du dernier tick -> le final gagne', () => {
+  const t = new PerformanceTracker(valueSnapshot(snap({ sol: 10 }), prices({ [SOL_MINT]: 100 })));
+  assert.strictEqual(t.update(valueSnapshot(snap({ sol: 9 }), prices({ [SOL_MINT]: 100 }))).pnlPct, -10);
+  const final = t.update(valueSnapshot(snap({ sol: 8.6 }), prices({ [SOL_MINT]: 100 })));
+  assert.strictEqual(final.pnlPct, -14);
+  const e = t.explain();
+  assert.strictEqual(e.initialEquity, 1000);
+  assert.strictEqual(e.finalEquity, 860);
+  assert.strictEqual(e.finalPnlPct, -14);
+});
+
+test('16. Transaction dupliquee comptee une seule fois', () => {
+  const seen = new Set();
+  const batch = [{ signature: 'sigA', type: TX_TYPE.TRANSFER_IN }, { signature: 'sigB', type: TX_TYPE.SWAP }];
+  assert.strictEqual(dedupeTransactions(batch, seen).length, 2);
+  // Le RPC renvoie a nouveau sigA dans la fenetre suivante.
+  const second = dedupeTransactions([{ signature: 'sigA', type: TX_TYPE.TRANSFER_IN }], seen);
+  assert.strictEqual(second.length, 0, 'sigA ne doit pas produire un second flux');
+});
+
+// -------- Classification des transactions --------
+
+function tx({ programs = [], solDelta = 0, fee = 5000, pre = [], post = [] }) {
+  const lamports = 1_000_000_000;
+  return {
+    slot: 42,
+    blockTime: 1_700_000_000,
+    transaction: {
+      signatures: ['sig'],
+      message: {
+        accountKeys: [{ pubkey: WALLET }],
+        instructions: programs.map((p) => ({ programId: p })),
+      },
+    },
+    meta: {
+      err: null,
+      fee,
+      preBalances: [lamports],
+      postBalances: [lamports + Math.round(solDelta * 1e9) - fee],
+      preTokenBalances: pre,
+      postTokenBalances: post,
+      innerInstructions: [],
+    },
+  };
 }
+
+const tb = (mint, amount) => ({
+  mint,
+  owner: WALLET,
+  uiTokenAmount: { uiAmountString: String(amount), decimals: 6 },
+});
+
+test('17. Swap via Jupiter classe SWAP (interne, pas un flux)', () => {
+  const c = classify(tx({ programs: [JUPITER], solDelta: -1, post: [tb(TOK_A, 500)] }), WALLET);
+  assert.strictEqual(c.type, TX_TYPE.SWAP);
+  assert.strictEqual(flowUsdValue(c, prices({ [TOK_A]: 2, [SOL_MINT]: 100 })), 0);
+});
+
+test('18. Reception de tokens classee TRANSFER_IN et valorisee', () => {
+  const c = classify(tx({ solDelta: 0, post: [tb(TOK_A, 100)] }), WALLET);
+  assert.strictEqual(c.type, TX_TYPE.TRANSFER_IN);
+  assert.strictEqual(flowUsdValue(c, prices({ [TOK_A]: 3, [SOL_MINT]: 100 })), 300);
+});
+
+test('19. Envoi de tokens classe TRANSFER_OUT (valeur negative)', () => {
+  const c = classify(tx({ solDelta: 0, pre: [tb(TOK_A, 100)] }), WALLET);
+  assert.strictEqual(c.type, TX_TYPE.TRANSFER_OUT);
+  assert.strictEqual(flowUsdValue(c, prices({ [TOK_A]: 3, [SOL_MINT]: 100 })), -300);
+});
+
+test('20. Transaction de frais seuls classee FEE', () => {
+  const c = classify(tx({ solDelta: 0 }), WALLET);
+  assert.strictEqual(c.type, TX_TYPE.FEE);
+  assert.strictEqual(flowUsdValue(c, prices({ [SOL_MINT]: 100 })), 0);
+});
+
+test('21. Flux non valorisable -> null (jamais neutralise a l aveugle)', () => {
+  const c = classify(tx({ solDelta: 0, post: [tb(TOK_NEW, 10)] }), WALLET);
+  assert.strictEqual(c.type, TX_TYPE.TRANSFER_IN);
+  assert.strictEqual(flowUsdValue(c, prices({ [TOK_NEW]: null, [SOL_MINT]: 100 })), null);
+});
+
+// -------- Invariants structurels --------
+
+test('22. Un actif non cote n est jamais valorise a 0', () => {
+  const v = valueSnapshot(
+    snap({ sol: 1, tokens: [{ mint: TOK_NEW, amount: 999 }] }),
+    prices({ [SOL_MINT]: 100, [TOK_NEW]: null })
+  );
+  const row = v.breakdown.find((b) => b.mint === TOK_NEW);
+  assert.strictEqual(row.price, null, 'price doit etre null, pas 0');
+  assert.strictEqual(row.value, null, 'value doit etre null, pas 0');
+  assert.strictEqual(v.unpricedAssets.length, 1);
+  assert.ok(v.coverage < 1);
+});
+
+test('23. Actif non cote des le depart : exclu des deux cotes, sans blocage', () => {
+  const holding = { sol: 10, tokens: [{ mint: TOK_NEW, amount: 5 }] };
+  const p = prices({ [SOL_MINT]: 100, [TOK_NEW]: null });
+  const initial = valueSnapshot(snap(holding), p);
+  const t = new PerformanceTracker(initial);
+  assert.strictEqual(t.initialEquity, 1000);
+  const r = t.update(valueSnapshot(snap({ sol: 11, tokens: [{ mint: TOK_NEW, amount: 5 }] }), p));
+  assert.strictEqual(r.applied, true, 'symetrique : ne doit pas geler le score');
+  assert.strictEqual(r.pnlPct, 10);
+});
+
+test('24. Sans flux, la chaine TWR egale exactement le ratio simple', () => {
+  const t = new PerformanceTracker(valueSnapshot(snap({ sol: 10 }), prices({ [SOL_MINT]: 100 })));
+  for (const sol of [10.4, 9.7, 11.2, 8.6]) {
+    t.update(valueSnapshot(snap({ sol }), prices({ [SOL_MINT]: 100 })));
+  }
+  const direct = (860 / 1000 - 1) * 100;
+  assert.ok(near(t.explain().rawPerformance, direct), `${t.explain().rawPerformance} vs ${direct}`);
+  assert.strictEqual(t.pnlPct, -14);
+});
+
+test('25. La decomposition explique l equity actif par actif', () => {
+  const v = valueSnapshot(
+    snap({ sol: 2, tokens: [{ mint: TOK_A, amount: 50 }] }),
+    prices({ [SOL_MINT]: 100, [TOK_A]: 4 })
+  );
+  const sum = v.breakdown.reduce((s, b) => s + (b.value || 0), 0);
+  assert.strictEqual(sum, v.equity);
+  assert.strictEqual(v.equity, 400);
+});
+
+test('26. Le SOL immobilise en rent reste dans l equity', () => {
+  const base = snap({ sol: 1 });
+  // Ouverture d'une position : 0.002 SOL passent du solde natif au compte de token.
+  const avecPosition = {
+    ...snap({ sol: 0.998, tokens: [{ mint: TOK_A, amount: 100 }] }),
+    rent: { lamports: 2_000_000, amount: 0.002, accounts: 1 },
+  };
+  const p = prices({ [SOL_MINT]: 100, [TOK_A]: 0 });
+  const t = new PerformanceTracker(valueSnapshot(base, p));
+  assert.strictEqual(t.initialEquity, 100);
+
+  // Le token vaut 0 : sans la ligne de rent, l'equity tomberait a 99.80.
+  const v = valueSnapshot(avecPosition, p);
+  assert.strictEqual(round2(v.equity), 100, 'le rent ne doit pas disparaitre du patrimoine');
+  const rentRow = v.breakdown.find((b) => b.kind === 'token-account-rent');
+  assert.ok(rentRow && rentRow.recoverable === true);
+  assert.strictEqual(round2(rentRow.value), 0.2);
+});
+
+// --------------------------------------------------------------------------
+
+(async () => {
+  let passed = 0;
+  const failures = [];
+  console.log(`\nPipeline de performance — ${tests.length} tests\n`);
+  for (const t of tests) {
+    try {
+      await t.fn();
+      console.log(`  ok   ${t.name}`);
+      passed++;
+    } catch (e) {
+      console.log(`  FAIL ${t.name}`);
+      console.log(`       ${e.message}`);
+      failures.push(t.name);
+    }
+  }
+  console.log(`\n${passed}/${tests.length} tests passes`);
+  if (failures.length) {
+    console.log(`Echecs : ${failures.join(', ')}\n`);
+    process.exit(1);
+  }
+  console.log('');
+})();
