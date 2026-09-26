@@ -856,7 +856,7 @@ main#app:has(#lobby.active) {
 .recap-chart {
   display: block;
   width: 100%;
-  height: 60px;
+  height: 84px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 8px;

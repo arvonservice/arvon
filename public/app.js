@@ -1999,7 +1999,104 @@ async function fetchTraderRecap() {
   }
 }
 
+const RECAP_POSITIVE = '#17b8d1';
+const RECAP_NEGATIVE = '#ff4d6d';
+
+// Courbe du recap. Dessinee a la taille reellement affichee : un canvas de
+// taille fixe etire par le CSS deforme tout (le point final devenait un ovale).
+function drawRecapChart(canvas, values) {
+  const rect = canvas.getBoundingClientRect();
+  if (!values || !values.length || rect.width < 2 || rect.height < 2) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const w = rect.width;
+  const h = rect.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const css = getComputedStyle(document.documentElement);
+  const dim = css.getPropertyValue('--text-dim').trim() || '#8a94a6';
+  const mono = css.getPropertyValue('--font-mono').trim() || 'monospace';
+  const colorOf = (v) => (v >= 0 ? RECAP_POSITIVE : RECAP_NEGATIVE);
+
+  // Le 0 % est toujours dans l'echelle : c'est le repere qui dit si l'on gagne
+  // ou si l'on perd, meme quand tous les matchs ont le meme score.
+  const min = Math.min(...values, 0);
+  const max = Math.max(...values, 0);
+  const span = max - min || 1;
+  const pad = { top: 14, bottom: 14, left: 14, right: 64 };
+  const plotW = w - pad.left - pad.right;
+  const y = (v) => pad.top + (h - pad.top - pad.bottom) * (1 - (v - min) / span);
+  const x = (i) => (values.length === 1 ? pad.left + plotW / 2 : pad.left + (i / (values.length - 1)) * plotW);
+
+  const y0 = y(0);
+  ctx.save();
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = dim;
+  ctx.globalAlpha = 0.45;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.left, y0);
+  ctx.lineTo(w - pad.right, y0);
+  ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = dim;
+  ctx.font = `10px ${mono}`;
+  ctx.textBaseline = 'middle';
+  ctx.fillText('0%', w - pad.right + 10, y0);
+
+  const last = values[values.length - 1];
+  const color = colorOf(last);
+  if (values.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(x(0), y0);
+    values.forEach((v, i) => ctx.lineTo(x(i), y(v)));
+    ctx.lineTo(x(values.length - 1), y0);
+    ctx.closePath();
+    ctx.fillStyle = `${color}22`;
+    ctx.fill();
+
+    ctx.beginPath();
+    values.forEach((v, i) => (i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v))));
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 6;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // Un point par match, le dernier mis en avant.
+  values.forEach((v, i) => {
+    const isLast = i === values.length - 1;
+    ctx.beginPath();
+    ctx.arc(x(i), y(v), isLast ? 4 : 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = colorOf(v);
+    ctx.fill();
+  });
+
+  // Valeur du dernier match, sauf si elle chevaucherait le libelle 0 %.
+  const lastY = Math.min(h - 8, Math.max(8, y(last)));
+  if (Math.abs(lastY - y0) >= 12) {
+    ctx.fillStyle = color;
+    ctx.font = `700 11px ${mono}`;
+    ctx.fillText(`${last > 0 ? '+' : ''}${last.toFixed(2)}%`, w - pad.right + 10, lastY);
+  }
+}
+
+// Le bloc du recap est cache tant qu'aucun mode n'est choisi : la courbe est
+// redessinee des qu'il devient visible ou change de taille.
+const recapChartObserver =
+  typeof ResizeObserver === 'undefined'
+    ? null
+    : new ResizeObserver((entries) => entries.forEach((e) => drawRecapChart(e.target, e.target.recapValues)));
+
 function buildTraderRecapContent(container, data) {
+  if (recapChartObserver) container.querySelectorAll('canvas.recap-chart').forEach((c) => recapChartObserver.unobserve(c));
   container.innerHTML = '';
   if (!currentUser) {
     const msg = document.createElement('p');
@@ -2008,7 +2105,7 @@ function buildTraderRecapContent(container, data) {
     container.appendChild(msg);
     return;
   }
-  if (!data || data.matches.length < 2) {
+  if (!data || !data.matches.length) {
     const msg = document.createElement('p');
     msg.className = 'hint recap-empty';
     msg.textContent = t('recap24h.empty');
@@ -2017,10 +2114,10 @@ function buildTraderRecapContent(container, data) {
   }
   const canvas = document.createElement('canvas');
   canvas.className = 'recap-chart';
-  canvas.width = 260;
-  canvas.height = 60;
+  canvas.recapValues = data.matches.map((m) => m.pnlPct);
   container.appendChild(canvas);
-  drawSparkline(canvas, data.matches.map((m) => m.pnlPct));
+  drawRecapChart(canvas, canvas.recapValues);
+  if (recapChartObserver) recapChartObserver.observe(canvas);
 
   const stats = document.createElement('div');
   stats.className = 'recap-stats';
