@@ -618,6 +618,19 @@ socket.on('matchUpdate', (data) => {
   matchEndsAt = Date.now() + data.remainingMs;
 });
 
+// Fin de match : le serveur relit les transactions de chaque joueur avant
+// d'annoncer le resultat (et avant tout paiement).
+socket.on('matchVerifying', () => {
+  clearInterval(matchTimerTicker);
+  clearInterval(brMatchTimerTicker);
+  for (const id of ['matchTimer', 'brTimer']) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.textContent = t('match.verifying');
+    el.classList.remove('timer-urgent');
+  }
+});
+
 socket.on('matchEnd', async (data) => {
   clearInterval(matchTimerTicker);
   lastResultsData = data;
@@ -749,27 +762,43 @@ function buildPlayerCard(p) {
 
   const tagsBox = document.createElement('div');
   tagsBox.className = 'card-tags';
-  if (p.simulated) {
-    const tag = document.createElement('div');
-    tag.className = 'tag';
-    tag.textContent = t('match.simulatedTag');
-    tagsBox.appendChild(tag);
-  }
-  if (p.walletError) {
-    const warn = document.createElement('div');
-    warn.className = 'tag warn';
-    warn.textContent = p.walletError;
-    tagsBox.appendChild(warn);
-  }
-  if (p.staked > 0) {
-    const stakeTag = document.createElement('div');
-    stakeTag.className = 'tag';
-    stakeTag.textContent = t('match.stakeTag', { amount: p.staked });
-    tagsBox.appendChild(stakeTag);
-  }
+  renderCardTags(tagsBox, p);
   card.appendChild(tagsBox);
 
   return card;
+}
+
+// Les etiquettes changent en cours de match (alerte, token sans prix...) :
+// elles sont redessinees a chaque mise a jour, seulement si elles ont change.
+function renderCardTags(box, p) {
+  const signature = JSON.stringify([p.simulated, p.walletError, p.alert, p.staked]);
+  if (box.dataset.signature === signature) return;
+  box.dataset.signature = signature;
+  box.innerHTML = '';
+  const add = (text, className = 'tag') => {
+    const el = document.createElement('div');
+    el.className = className;
+    el.textContent = text;
+    box.appendChild(el);
+  };
+  if (p.simulated && !p.walletError) add(t('match.simulatedTag'));
+  if (p.walletError) add(p.walletError, 'tag warn');
+  if (p.alert) add(t('match.alertTag'), 'tag warn');
+  if (p.staked > 0) add(t('match.stakeTag', { amount: p.staked }));
+}
+
+// Etiquette de verification affichee dans les resultats.
+const STATUS_TAG_KEYS = {
+  disqualified: 'results.dqTag',
+  neutralized: 'results.neutralizedTag',
+  unverified: 'results.unverifiedTag',
+};
+
+function statusTagHtml(p) {
+  const key = STATUS_TAG_KEYS[p.status] || (p.unranked ? 'match.unrankedTag' : null);
+  if (!key) return '';
+  const cls = p.status || 'unranked';
+  return `<span class="bot-tag status-tag ${cls}">${escapeHtml(t(key))}</span>`;
 }
 
 function updatePlayerCard(card, p) {
@@ -783,6 +812,9 @@ function updatePlayerCard(card, p) {
 
   const canvas = card.querySelector('canvas.sparkline');
   if (canvas) drawSparkline(canvas, p.history);
+
+  const tagsBox = card.querySelector('.card-tags');
+  if (tagsBox) renderCardTags(tagsBox, p);
 }
 
 function renderTeamColumn(elId, players, isUpdate) {
@@ -876,17 +908,22 @@ function drawSparkline(canvas, history) {
 function renderResults(data) {
   const [pnlA, pnlB] = data.teamPnl;
   const title = document.getElementById('resultTitle');
-  if (data.winner === 'draw') title.textContent = data.isCash ? t('results.drawCash') : t('results.draw');
+  if (data.outcome === 'refund') title.textContent = t('results.refund');
+  else if (data.outcome === 'void') title.textContent = t('results.void');
+  else if (data.winner === 'draw') title.textContent = data.isCash ? t('results.drawCash') : t('results.draw');
   else title.textContent = data.winner === 'A' ? t('results.teamAWins') : t('results.teamBWins');
 
   const existingNote = document.getElementById('resultPotNote');
   if (existingNote) existingNote.remove();
-  if (data.isCash) {
+  const notes = [];
+  if (data.outcome === 'forfeit') notes.push(t('results.forfeitNote'));
+  if (data.isCash && data.outcome !== 'refund') notes.push(t('results.potNote', { pot: data.pot }));
+  if (notes.length) {
     const note = document.createElement('p');
     note.id = 'resultPotNote';
     note.className = 'hint';
     note.style.textAlign = 'center';
-    note.textContent = t('results.potNote', { pot: data.pot });
+    note.textContent = notes.join(' ');
     title.insertAdjacentElement('afterend', note);
   }
 
@@ -916,7 +953,7 @@ function buildResultTeam(label, pnl, players, isWinner, payouts) {
 
   players.forEach((p) => {
     const row = document.createElement('div');
-    row.className = 'result-row';
+    row.className = p.status === 'disqualified' ? 'result-row dq' : 'result-row';
 
     const nameSpan = document.createElement('span');
     const payout = payouts && payouts[p.id];
@@ -928,6 +965,8 @@ function buildResultTeam(label, pnl, players, isWinner, payouts) {
       botTag.textContent = t('match.botTag');
       nameSpan.prepend(botTag);
     }
+    const statusTag = statusTagHtml(p);
+    if (statusTag) nameSpan.insertAdjacentHTML('beforeend', statusTag);
 
     const pnlSpan = document.createElement('span');
     pnlSpan.className = p.pnlPct >= 0 ? 'positive' : 'negative';
@@ -1019,7 +1058,8 @@ socket.on('brMatchEnd', (data) => {
   document.getElementById('brEliminatedModal').classList.add('hidden');
   clearInterval(brNextEliminationTicker);
   clearInterval(brMatchTimerTicker);
-  const iWon = currentUser && data.ranking[0] && data.ranking[0].name === currentUser.displayName;
+  const winner = data.outcome === 'win' ? data.ranking[0] : null;
+  const iWon = currentUser && winner && winner.name === currentUser.displayName;
   if (iWon) spawnConfetti();
   lastBrResultsData = data;
   renderBrResults(data);
@@ -1075,6 +1115,13 @@ function renderBrMatch(data) {
       tag.textContent = t('br.eliminatedTag');
       card.appendChild(tag);
     }
+    for (const text of [p.walletError, p.alert ? t('match.alertTag') : null]) {
+      if (!text) continue;
+      const tag = document.createElement('div');
+      tag.className = 'tag warn';
+      tag.textContent = text;
+      card.appendChild(tag);
+    }
 
     grid.appendChild(card);
     drawSparkline(canvas, p.history);
@@ -1088,12 +1135,17 @@ function renderBrResults(data) {
   podium.innerHTML = '';
   const existingNote = document.getElementById('brPotNote');
   if (existingNote) existingNote.remove();
-  if (data.isCash) {
+  const noteText =
+    data.outcome === 'refund' ? t('br.refund')
+    : data.outcome === 'void' ? t('br.void')
+    : data.isCash ? t('br.potNoteWinner', { pot: data.pot })
+    : null;
+  if (noteText) {
     const potNote = document.createElement('p');
     potNote.id = 'brPotNote';
     potNote.className = 'hint';
     potNote.style.textAlign = 'center';
-    potNote.textContent = t('br.potNoteWinner', { pot: data.pot });
+    potNote.textContent = noteText;
     podium.parentElement.insertBefore(potNote, podium);
   }
   const order = [1, 0, 2];
@@ -1117,11 +1169,11 @@ function renderBrResults(data) {
   list.innerHTML = '';
   data.ranking.forEach((p) => {
     const row = document.createElement('div');
-    row.className = 'br-rank-row';
+    row.className = p.status === 'disqualified' ? 'br-rank-row dq' : 'br-rank-row';
     row.innerHTML = `
       <span class="br-rank-num">#${p.rank}</span>
       <img src="${p.avatar || defaultAvatarDataUri(p.name)}" alt="">
-      <span class="br-rank-name">${p.isBot ? `<span class="bot-tag">${t('match.botTag')}</span>` : ''}${escapeHtml(p.name)}</span>
+      <span class="br-rank-name">${p.isBot ? `<span class="bot-tag">${t('match.botTag')}</span>` : ''}${escapeHtml(p.name)}${statusTagHtml(p)}</span>
       <span class="${p.pnlPct >= 0 ? 'positive' : 'negative'}">${p.pnlPct > 0 ? '+' : ''}${p.pnlPct.toFixed(2)}%</span>
     `;
     list.appendChild(row);

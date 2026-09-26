@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "node test/performance-tracking.test.js",
+    "test": "node test/performance-tracking.test.js && node test/game-flow.test.js",
     "inspect-wallet": "node tools/inspect-wallet.js"
   },
   "dependencies": {

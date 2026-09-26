@@ -182,7 +182,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on('findMatch', ({ mode, duration, cash } = {}) => {
-    engine.joinQueue(socket.id, mode, duration, !!cash);
+    engine.joinQueue(socket.id, mode, duration, !!cash).catch((e) => {
+      console.error('[queue] Erreur a l entree en file', e.message);
+      socket.emit('matchError', 'Erreur inattendue, reessaie.');
+    });
   });
 
   socket.on('cancelQueue', () => {
@@ -190,7 +193,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on('findBrMatch', ({ cash } = {}) => {
-    engine.joinBrQueue(socket.id, !!cash);
+    engine.joinBrQueue(socket.id, !!cash).catch((e) => {
+      console.error('[br-queue] Erreur a l entree en file', e.message);
+      socket.emit('matchError', 'Erreur inattendue, reessaie.');
+    });
   });
 
   socket.on('cancelBrQueue', () => {
@@ -232,14 +238,14 @@ io.on('connection', (socket) => {
     if (player && player.matchId) socket.leave(player.matchId);
   });
 
-  socket.on('challengeUser', ({ targetUserId, duration, cash } = {}) => {
-    const result = engine.sendChallenge(socket.id, Number(targetUserId), duration, !!cash);
+  socket.on('challengeUser', async ({ targetUserId, duration, cash } = {}) => {
+    const result = await engine.sendChallenge(socket.id, Number(targetUserId), duration, !!cash);
     if (result.error) socket.emit('matchError', result.error);
     else socket.emit('challengeSent', { challengeId: result.challengeId });
   });
 
-  socket.on('challengeRespond', ({ challengeId, accept } = {}) => {
-    const result = engine.respondChallenge(socket.id, challengeId, !!accept);
+  socket.on('challengeRespond', async ({ challengeId, accept } = {}) => {
+    const result = await engine.respondChallenge(socket.id, challengeId, !!accept);
     if (result.error) socket.emit('matchError', result.error);
   });
 

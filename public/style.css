@@ -442,6 +442,15 @@ main#app:has(#lobby.active) {
   vertical-align: middle;
 }
 
+/* Statut de verification anti-triche dans les resultats */
+.status-tag { margin: 0 0 0 6px; text-transform: uppercase; }
+.status-tag.disqualified { color: var(--red); background: rgba(255,77,109,0.12); border-color: rgba(255,77,109,0.35); }
+.status-tag.neutralized,
+.status-tag.unverified,
+.status-tag.unranked { color: var(--yellow); background: rgba(255,209,102,0.1); border-color: rgba(255,209,102,0.3); }
+.result-row.dq > span:last-child,
+.br-rank-row.dq > span:last-child { text-decoration: line-through; opacity: 0.55; }
+
 .winner-badge {
   display: inline-block;
   width: 13px;

@@ -7,7 +7,8 @@
 
 const { getWalletSnapshot, snapshotMints } = require('../lib/wallet');
 const { getPrices } = require('../lib/pricing');
-const { valueSnapshot } = require('../lib/performance');
+const { valueSnapshot, assessEligibility } = require('../lib/performance');
+const { eligibilityMessage } = require('../lib/playertracker');
 
 const wallet = process.argv[2];
 if (!wallet) {
@@ -59,6 +60,14 @@ function pad(s, n) {
   }
   if (errors.length) console.log(`\nErreurs de prix :`, errors);
   if (snapshot.errors.length) console.log(`Erreurs wallet :`, snapshot.errors);
+
+  const e = assessEligibility(snapshot, prices);
+  console.log('\nDEPART D UN MATCH');
+  console.log(`  autorise      : ${e.eligible ? 'oui' : 'NON'}`);
+  console.log(`  SOL natif     : ${e.nativeSol} SOL`);
+  console.log(`  capital       : ${e.capitalSol.toFixed(6)} SOL (base du pourcentage)`);
+  console.log(`  tokens        : ${e.volatileSol.toExponential(2)} SOL (tolerance ${e.toleranceSol} SOL)`);
+  if (!e.eligible) console.log(`  message       : ${eligibilityMessage(e)}`);
   console.log('');
 })().catch((e) => {
   console.error('Echec :', e.message);
