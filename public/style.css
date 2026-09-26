@@ -1703,3 +1703,25 @@ body::before {
   0%, 100% { box-shadow: 0 0 6px var(--green); }
   50% { box-shadow: 0 0 12px var(--green); }
 }
+
+/* Bouton Discord (bas droite) : pleine opacite et bleu Discord eclairci pour
+   ressortir sur le fond sombre. */
+.discord-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #8491f7;
+  border-radius: 6px;
+  color: #fff;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(132, 145, 247, 0.35);
+  transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.discord-btn:hover {
+  background: #9aa5f9;
+  box-shadow: 0 6px 20px rgba(154, 165, 249, 0.5);
+  transform: translateY(-1px);
+}
