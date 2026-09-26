@@ -11,6 +11,22 @@
 </head>
 <body>
 
+<!-- Telephones et tablettes : Arvon se joue sur ordinateur (cf. .mobile-gate) -->
+<div class="mobile-gate" id="mobileGate" role="dialog" aria-modal="true" aria-labelledby="mobileGateTitle">
+  <img class="mobile-gate-logo" src="/assets/logo.png" alt="Arvon">
+  <svg class="mobile-gate-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="2.5" y="3.5" width="19" height="13" rx="1.5"></rect>
+    <path d="M8 20.5h8M12 16.5v4"></path>
+  </svg>
+  <p class="mobile-gate-welcome" data-i18n="mobile.welcome">Bienvenue sur Arvon</p>
+  <h1 id="mobileGateTitle" data-i18n="mobile.title">Arvon se joue sur ordinateur</h1>
+  <p class="mobile-gate-text" data-i18n="mobile.text">Les matchs se jouent en direct avec ton wallet Solana. Ouvre Arvon sur un PC ou un Mac pour jouer.</p>
+  <div class="lang-switch mobile-gate-lang">
+    <button class="lang-btn" data-lang="fr">FR</button>
+    <button class="lang-btn" data-lang="en">EN</button>
+  </div>
+</div>
+
 <header class="topbar">
   <button class="logo-btn" id="logoBtn" aria-label="Retour au lobby"><img class="logo" src="/assets/logo.png" alt="Arvon"></button>
 

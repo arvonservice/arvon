@@ -45,6 +45,10 @@ const I18N = {
 
     'duration.title': 'Duree du match',
     'duration.1h': '1 heure',
+    'mobile.welcome': 'Bienvenue sur Arvon',
+    'mobile.title': 'Arvon se joue sur ordinateur',
+    'mobile.text': 'Les matchs se jouent en direct avec ton wallet Solana. Ouvre Arvon sur un PC ou un Mac pour jouer.',
+
     'recap24h.title': 'Ton recap trading',
     'recap24h.title24h': 'Ton recap · 24h',
     'recap24h.loginPrompt': 'Connecte-toi pour voir ton recap de trading.',
@@ -296,6 +300,10 @@ const I18N = {
 
     'duration.title': 'Match duration',
     'duration.1h': '1 hour',
+    'mobile.welcome': 'Welcome to Arvon',
+    'mobile.title': 'Arvon is played on a computer',
+    'mobile.text': 'Matches are played live with your Solana wallet. Open Arvon on a PC or Mac to play.',
+
     'recap24h.title': 'Your trading recap',
     'recap24h.title24h': 'Your recap · 24h',
     'recap24h.loginPrompt': 'Log in to see your trading recap.',

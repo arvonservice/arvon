@@ -1725,3 +1725,44 @@ body::before {
   box-shadow: 0 6px 20px rgba(154, 165, 249, 0.5);
   transform: translateY(-1px);
 }
+
+/* Ecran d'accueil mobile : sur un appareil tactile sans survol (telephone,
+   tablette), Arvon demande de passer sur ordinateur. Jamais affiche sur un
+   ordinateur, meme dans une fenetre etroite. */
+.mobile-gate { display: none; }
+@media (hover: none) and (pointer: coarse) {
+  .mobile-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 32px 24px;
+    text-align: center;
+    color: var(--text);
+    background:
+      radial-gradient(circle at 50% 28%, rgba(23, 184, 209, 0.14), transparent 62%),
+      var(--bg);
+  }
+}
+.mobile-gate-logo { width: 150px; height: auto; margin-bottom: 10px; }
+.mobile-gate-icon {
+  width: 64px;
+  height: 64px;
+  color: var(--green);
+  filter: drop-shadow(0 0 12px rgba(23, 184, 209, 0.45));
+}
+.mobile-gate-welcome {
+  margin: 6px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--green);
+}
+.mobile-gate h1 { margin: 0; max-width: 320px; font-size: 24px; line-height: 1.25; }
+.mobile-gate-text { margin: 0; max-width: 320px; font-size: 15px; line-height: 1.6; color: var(--text-dim); }
+.mobile-gate-lang { margin-top: 14px; }
